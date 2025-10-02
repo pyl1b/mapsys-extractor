@@ -1,0 +1,87 @@
+[project]
+authors = [
+    { name = "Nicu Tofan", email = "nicu.tofan@gmail.com" },
+]
+classifiers = [
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3 :: Only",
+  "Development Status :: 3 - Alpha",
+  "License :: Other/Proprietary License",
+  "Typing :: Typed",
+]
+description = "Explore mapsys."
+dynamic = ["version"]
+name = "mapsys"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {file = "LICENSE"}
+dependencies = [
+  "click>=8.1.8,<9",
+  "dotenv>=0.9.9",
+  "sqlalchemy>=2.0,<3",
+  "requests>=2.32.3,<3",
+  "beautifulsoup4>=4.12,<5",
+  "attrs>=23,<26",
+  "pyyaml>=6.0,<7",
+  "openpyxl>=3.1,<4",
+  "InquirerPy>=0.3.4,<0.4",
+  "colorama>=0.4.6,<0.5",
+  "pyodbc>=5.2.0,<6",
+]
+
+[project.urls]
+Homepage = "https://github.com/pyl1b/mapsys"
+Repository = "https://github.com/pyl1b/mapsys"
+Changelog = "https://github.com/pyl1b/mapsys/blob/main/CHANGELOG.md"
+Issues = "https://github.com/pyl1b/mapsys/issues"
+Documentation = "https://github.com/pyl1b/mapsys/blob/main/README.md"
+
+[project.scripts]
+mapsys = "mapsys.__main__:cli"
+
+[project.optional-dependencies]
+dev = [
+  "ruff",
+  "build",
+  "mypy>=1.8,<2",
+  "pre-commit",
+  "pytest-cov",
+  "pytest-mock",
+  "pytest",
+  "twine",
+  "wheel",
+  "types-requests",
+  "types-PyYAML",
+  "types-openpyxl",
+]
+
+
+[build-system]
+build-backend = "setuptools.build_meta"
+requires = ["setuptools>=68.0", "setuptools_scm[toml]>=8", "wheel"]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+exclude = ["venv*", "playground*"]
+
+[tool.setuptools_scm]
+fallback_version = "0.0.1-dev"
+write_to = "mapsys/__version__.py"
+
+[tool.ruff]
+line-length = 79
+target-version = "py313"
+extend-exclude = ["venv", ".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "ANN"]  # E=pycodestyle, F=pyflakes, I=imports
+ignore = ["ANN102", "ANN401", "E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.mypy]
+plugins = []

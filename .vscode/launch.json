@@ -1,0 +1,25 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "rebuild index",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "mapsys.__main__",
+      "args": [
+        "--trace",
+        "rebuild-index",
+        "E:/Advaita/altele/Resurse pe UAT-uri/Voslobeni/vice/administrativ UAT Voslabeni",
+        "--db",
+        "${workspaceFolder}/playground/index.sqlite3",
+        "--ext", "py"
+      ],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      "windows": {
+        "python": "${workspaceFolder}//venv//Scripts//python.exe"
+      }
+    },
+  ]
+}

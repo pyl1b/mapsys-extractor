@@ -1,0 +1,20 @@
+{
+    "cSpell.words": [
+        "beautifulsoup",
+        "colorama",
+        "dotenv",
+        "mapsys",
+        "openpyxl",
+        "pycodestyle",
+        "pyflakes",
+        "pyodbc",
+        "pyyaml",
+        "setuptools"
+    ],
+    "python.formatting.provider": "none",
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "[python]": { "editor.formatOnSave": true },
+    "ruff.lint.enable": true,
+    "ruff.format.args": [],
+    "python.languageServer": "None"
+}
