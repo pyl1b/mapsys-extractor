@@ -115,7 +115,7 @@ def cli_rebuild_index(root: str, db_path: Path, exts: Tuple[str, ...]) -> None:
                 logging.error(
                     "Multiple main files found: %s and %s",
                     main_file,
-                    file_path
+                    file_path,
                 )
                 return
             main_file = file_path
@@ -124,8 +124,6 @@ def cli_rebuild_index(root: str, db_path: Path, exts: Tuple[str, ...]) -> None:
         return
     logging.debug("Found main file: %s", main_file)
 
-
     content = Content.create(main_file)
 
-
-    click.echo("Done.")
+    click.echo(f"Done: {content}")

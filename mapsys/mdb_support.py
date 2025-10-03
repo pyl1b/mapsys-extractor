@@ -11,15 +11,15 @@ Usage:
 """
 
 from __future__ import annotations
+
+import json
 import logging
 import os
-import json
-import sys
-from datetime import datetime, date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Dict, List
-import pyodbc  # type: ignore
 
+import pyodbc  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,6 @@ def _convert_value(v: Any) -> Any:
 
 
 def _extract_with_pyodbc(db_path: str) -> Dict[str, List[Dict[str, Any]]]:
-
     # Common Access driver name on Windows. On macOS/Linux you may have a
     # unixODBC driver installed.
     drivers = [
@@ -78,9 +77,11 @@ def _extract_with_pyodbc(db_path: str) -> Dict[str, List[Dict[str, Any]]]:
         # Fallback: some drivers don’t return table types reliably
         if not tables:
             cur.execute(
-                "SELECT name FROM MSysObjects WHERE Type=1 AND Flags=0")
-            tables = [r[0]
-                      for r in cur.fetchall() if not r[0].startswith("MSys")]
+                "SELECT name FROM MSysObjects WHERE Type=1 AND Flags=0"
+            )
+            tables = [
+                r[0] for r in cur.fetchall() if not r[0].startswith("MSys")
+            ]
 
         for tbl in tables:
             try:
@@ -88,8 +89,10 @@ def _extract_with_pyodbc(db_path: str) -> Dict[str, List[Dict[str, Any]]]:
                 columns = [d[0] for d in cur.description]
                 rows = cur.fetchall()
                 data[tbl] = [
-                    {col: _convert_value(val)
-                     for col, val in zip(columns, row)}
+                    {
+                        col: _convert_value(val)
+                        for col, val in zip(columns, row)
+                    }
                     for row in rows
                 ]
             except Exception as e:
@@ -120,11 +123,13 @@ def extract_access_db(db_path: str) -> Dict[str, List[Dict[str, Any]]]:
         logger.warning("pyodbc failed: %s", e)
         raise
 
+
 # -------------------- Example CLI --------------------
 
 
 if __name__ == "__main__":
     import argparse
+
     ap = argparse.ArgumentParser(description="Dump Access DB to JSON")
     ap.add_argument("db", help="Path to .mdb or .accdb")
     ap.add_argument("-o", "--out", help="Write JSON to this path")
