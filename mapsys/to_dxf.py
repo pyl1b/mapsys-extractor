@@ -90,7 +90,7 @@ def _iter_poly_vertices(
     num_points = len(points)
 
     for entry in ar:
-        start = entry.vertex_offset - 1
+        start = entry.vertex_offset
         count = entry.vertex_count
 
         # Validate start/count against the offsets table size.

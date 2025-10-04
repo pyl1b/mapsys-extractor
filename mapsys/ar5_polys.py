@@ -35,8 +35,8 @@ logger = logging.getLogger(__name__)
 
 
 # Binary struct formats (little-endian, tightly packed, no implicit padding)
-_AR5_HEADER_STRUCT = struct.Struct("<4s4IB")
-_AR5_DATA_STRUCT = struct.Struct("<IIIIHIBIBB")
+_AR5_HEADER_STRUCT = struct.Struct("<4s4I")
+_AR5_DATA_STRUCT = struct.Struct("<BIIIIHIBIB")
 
 
 @dataclass(frozen=True)
@@ -51,7 +51,6 @@ class Ar5Header:
 
     signature: bytes
     int1: Tuple[int, int, int, int]
-    pad: int
 
 
 @dataclass(frozen=True)
@@ -59,6 +58,7 @@ class Ar5Data:
     """One AR5 polyline index entry.
 
     Attributes:
+        unk8: Small categorical value (0, 1).
         line_id: Identifier of the line.
         line_nr: Line number.
         unk1: Always 0 in observed files.
@@ -68,9 +68,9 @@ class Ar5Data:
         layer_count: Layer counter/amount; correlates with UI observations.
         unk6: Mostly unique; some values may repeat.
         unk7: Small categorical value (0, 1, 2).
-        unk8: Small categorical value (0, 1).
     """
 
+    unk8: int
     line_id: int
     line_nr: int
     unk1: int
@@ -80,7 +80,6 @@ class Ar5Data:
     layer_count: int
     unk6: int
     unk7: int
-    unk8: int
 
 
 def _parse_ar5_header(data: bytes, offset: int = 0) -> Tuple[Ar5Header, int]:
@@ -104,7 +103,7 @@ def _parse_ar5_header(data: bytes, offset: int = 0) -> Tuple[Ar5Header, int]:
         raise ValueError("Buffer too small for AR5 header + pad")
 
     # Unpack header fields.
-    signature, i1, i2, i3, i4, pad = _AR5_HEADER_STRUCT.unpack_from(
+    signature, i1, i2, i3, i4 = _AR5_HEADER_STRUCT.unpack_from(
         data, offset
     )
 
@@ -113,7 +112,7 @@ def _parse_ar5_header(data: bytes, offset: int = 0) -> Tuple[Ar5Header, int]:
         raise ValueError("Invalid AR5 signature: %r" % (signature,))
 
     # Build header dataclass.
-    header = Ar5Header(signature=signature, int1=(i1, i2, i3, i4), pad=pad)
+    header = Ar5Header(signature=signature, int1=(i1, i2, i3, i4))
 
     # Skip header and fixed 9-byte pad following the header.
     new_off = offset + _AR5_HEADER_STRUCT.size + 9
@@ -141,6 +140,7 @@ def _parse_ar5_data_until_eof(
     # Read as many whole records as possible.
     while offset + size <= data_len:
         (
+            unk8,
             line_id,
             line_nr,
             unk1,
@@ -150,7 +150,6 @@ def _parse_ar5_data_until_eof(
             layer_count,
             unk6,
             unk7,
-            unk8,
         ) = _AR5_DATA_STRUCT.unpack_from(data, offset)
 
         # Append immutable record.

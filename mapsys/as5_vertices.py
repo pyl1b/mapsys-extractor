@@ -25,7 +25,7 @@ from typing import List, Tuple
 logger = logging.getLogger(__name__)
 
 
-_AS5_HEADER_STRUCT = struct.Struct("<4s5IB")
+_AS5_HEADER_STRUCT = struct.Struct("<4s4IB")
 _U32_STRUCT = struct.Struct("<I")
 
 
@@ -40,7 +40,7 @@ class As5Header:
     """
 
     signature: bytes
-    int1: Tuple[int, int, int, int, int]
+    int1: Tuple[int, int, int, int]
     pad: int
 
 
@@ -53,14 +53,14 @@ def _parse_as5_header(data: bytes, offset: int = 0) -> Tuple[As5Header, int]:
     if len(data) - offset < _AS5_HEADER_STRUCT.size:
         raise ValueError("Buffer too small for AS5 header")
 
-    signature, i1, i2, i3, i4, i5, pad = _AS5_HEADER_STRUCT.unpack_from(
+    signature, i1, i2, i3, i4, pad = _AS5_HEADER_STRUCT.unpack_from(
         data, offset
     )
 
     if signature != b"VA50":
         raise ValueError("Invalid AS5 signature: %r" % (signature,))
 
-    header = As5Header(signature=signature, int1=(i1, i2, i3, i4, i5), pad=pad)
+    header = As5Header(signature=signature, int1=(i1, i2, i3, i4), pad=pad)
     return header, offset + _AS5_HEADER_STRUCT.size
 
 

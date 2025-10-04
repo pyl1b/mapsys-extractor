@@ -2,7 +2,7 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "rebuild py index",
+      "label": "MapSys to DXF",
       "type": "process",
       "command": "${command:python.interpreterPath}",
       "windows": {
@@ -10,11 +10,23 @@
       },
       "args": [
         "mapsys",
-        "rebuild-index",
-        "--db", "${workspaceFolder}/playground/index.sqlite3",
-        "--ext",
-        "py",
-        "${input:root}"
+        "--trace",
+        "--log-file",
+        "${workspaceFolder}/playground/mapsys-to-dxf.log",
+        "to-dxf",
+        "${input:src}",
+        "--dxf",
+        "${input:destination}",
+        "--dxf-template",
+        "${workspaceFolder}/playground/template.dxf",
+        "--point-block",
+        "PCT3D",
+        "--point-name-attrib",
+        "PTNAME",
+        "--point-source-attrib",
+        "SOURCE",
+        "--point-z-attrib",
+        "Z"
       ],
       "options": {
         "cwd": "${workspaceFolder}"
@@ -24,68 +36,20 @@
         "panel": "dedicated",
         "clear": true
       },
-    },
-    {
-      "label": "add to py index",
-      "type": "process",
-      "command": "${command:python.interpreterPath}",
-      "windows": {
-        "command": "${workspaceFolder}\\venv\\Scripts\\python.exe"
-      },
-      "args": [
-        "mapsys",
-        "add-to-index",
-        "--db", "${workspaceFolder}/playground/index.sqlite3",
-        "--ext",
-        "py",
-        "${input:root}"
-      ],
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "clear": true
-      },
-    },
-    {
-      "label": "search py code",
-      "type": "process",
-      "command": "${command:python.interpreterPath}",
-      "windows": {
-        "command": "${workspaceFolder}\\venv\\Scripts\\python.exe"
-      },
-      "args": [
-        "mapsys",
-        "search",
-        "--db", "${workspaceFolder}/playground/index.sqlite3",
-        "--ext",
-        "py",
-        "${input:query}"
-      ],
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "clear": true
-      },
+      "problemMatcher": []
     }
   ],
   "inputs": [
     {
-      "id": "root",
+      "id": "src",
       "type": "promptString",
-      "description": "Root directory to scan recursively for repositories."
+      "description": "Source directorywhere the Mapsys files are located."
     },
     {
-      "id": "query",
+      "id": "destination",
       "type": "promptString",
-      "description": "Query to search for."
+      "description": "Destination DXF file to create.",
+      "default": "${workspaceFolder}/playground/mapsys-output.dxf"
     }
   ]
 }
-
-
