@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional
 
 import click
 from dotenv import load_dotenv  # type: ignore[import-not-found]
@@ -72,38 +72,78 @@ def cli(debug: bool, trace: bool, log_file: Optional[str] = None) -> None:
     load_dotenv()
 
 
-@cli.command(name="rebuild-index")
+@cli.command(name="to-dxf")
 @click.argument(
     "root", type=click.Path(file_okay=False, dir_okay=True, exists=True)
 )
 @click.option(
-    "--db",
-    "db_path",
+    "--dxf",
+    "dxf_path",
     type=click.Path(
         file_okay=True, dir_okay=False, writable=True, path_type=Path
     ),
-    default=Path(".mapsys/index.sqlite3"),
+    default=Path("mapsys.dxf"),
     show_default=True,
-    help="Path to the SQLite index database.",
+    help="Path to the DXF file to create.",
 )
 @click.option(
-    "--ext",
-    "exts",
-    multiple=True,
-    help=(
-        "File extension to include (repeatable). "
-        "May be given with or without leading dot. Default: py"
+    "--dxf-template",
+    "dxf_template",
+    type=click.Path(
+        file_okay=True, dir_okay=False, path_type=Path, exists=True
     ),
+    default=Path("mapsys.dxf"),
+    show_default=True,
+    help="Path to the DXF template file to use.",
 )
-def cli_rebuild_index(root: str, db_path: Path, exts: Tuple[str, ...]) -> None:
+@click.option(
+    "--point-block",
+    "point_block",
+    type=str,
+    default="POINT",
+    show_default=True,
+)
+@click.option(
+    "--point-name-attrib",
+    "point_name_attrib",
+    type=str,
+    default="NAME",
+    show_default=True,
+)
+@click.option(
+    "--point-source-attrib",
+    "point_source_attrib",
+    type=str,
+    default="SOURCE",
+    show_default=True,
+)
+@click.option(
+    "--point-z-attrib",
+    "point_z_attrib",
+    type=str,
+    default="Z",
+    show_default=True,
+)
+def mapsys_to_dxf(
+    root: str,
+    dxf_path: Path,
+    dxf_template: Path,
+    point_block: str,
+    point_name_attrib: str,
+    point_source_attrib: str,
+    point_z_attrib: str,
+) -> None:
     """Rebuild the index for git-tracked Python files under ROOT.
 
     Args:
         root: Directory to scan recursively for repositories.
-        db_path: Path to the SQLite database to (re)build.
-        exts: One or more file extensions to include.
+        dxf_path: Path to the DXF file to create.
+        dxf_template: Path to the DXF template file to use.
+        point_block: Name of the block used for point symbols.
+        point_name_attrib: Attribute tag used to store the point name/number.
     """
     from mapsys.content import Content
+    from mapsys.to_dxf import mapsys_to_dxf
 
     root_path = Path(root)
 
@@ -125,5 +165,17 @@ def cli_rebuild_index(root: str, db_path: Path, exts: Tuple[str, ...]) -> None:
     logging.debug("Found main file: %s", main_file)
 
     content = Content.create(main_file)
+    if content is None:
+        click.echo("No content found.", err=True)
+        return
 
-    click.echo(f"Done: {content}")
+    mapsys_to_dxf(
+        content,
+        dxf_template,
+        dxf_path=dxf_path,
+        point_block=point_block,
+        point_name_attrib=point_name_attrib,
+        point_source_attrib=point_source_attrib,
+        point_z_attrib=point_z_attrib,
+    )
+    click.echo("Done")

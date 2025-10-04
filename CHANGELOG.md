@@ -11,6 +11,7 @@ Versioning.
 
 - In interactive `browse` CLI allow adding or refreshing a repository.
 - Use Dependabot
+- VS50/AR5 parser for polyline index (`mapsys.ar5_polys`) with unit tests.
 
 ## 0.1.4
 

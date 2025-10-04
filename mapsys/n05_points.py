@@ -65,7 +65,8 @@ class No5Coord:
         north: Y coordinate (meters).
         z: Elevation (meters).
         uniq: Usually unique identifier.
-        connexion: Small integer flag, observed values 0..2.
+        connexion: The number of lines that use that point. For isolated
+            points it is 0.
     """
 
     type: int
@@ -103,7 +104,7 @@ def _parse_header(data: bytes, offset: int = 0) -> Tuple[No5Header, int]:
     )
 
     # Validate the signature.
-    if signature != b"VS50":
+    if signature != b"VA50":
         raise ValueError("Invalid NO5 signature: %r" % (signature,))
 
     # Build the header dataclass and return with new offset.

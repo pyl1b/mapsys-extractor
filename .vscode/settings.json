@@ -1,15 +1,27 @@
 {
     "cSpell.words": [
+        "ATTDEF",
+        "ATTDEFs",
+        "attribs",
         "beautifulsoup",
+        "blockref",
         "colorama",
         "dotenv",
+        "dxfattribs",
+        "ezdxf",
+        "Iddf",
+        "lwpolyline",
         "mapsys",
+        "modelspace",
         "openpyxl",
         "pycodestyle",
         "pyflakes",
         "pyodbc",
         "pyyaml",
-        "setuptools"
+        "setuptools",
+        "verts",
+        "xscale",
+        "yscale"
     ],
     "python.formatting.provider": "none",
     "editor.defaultFormatter": "charliermarsh.ruff",
