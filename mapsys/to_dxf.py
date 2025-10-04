@@ -19,6 +19,7 @@ from struct import Struct
 from typing import TYPE_CHECKING, Iterable
 
 from ezdxf.document import Drawing
+from ezdxf import zoom
 
 from mapsys.ar5_polys import Ar5Data
 from mapsys.n05_points import No5Coord
@@ -70,11 +71,62 @@ def _offset_to_point_index(offset: int) -> int | None:
     return relative // record_size
 
 
+def _rotate_dxf_backups(dxf_path: Path, max_backups: int = 10) -> None:
+    """Rotate existing DXF backups for ``dxf_path`` up to ``max_backups``.
+
+    If the target file exists, it is renamed to ``.bak1`` and older backups are
+    shifted up (``.bak1`` -> ``.bak2`` etc.). The oldest backup exceeding the
+    limit is removed.
+
+    Args:
+        dxf_path: The destination DXF path that may be overwritten.
+        max_backups: Maximum number of backup copies to keep.
+    """
+
+    try:
+        # Guard: nothing to rotate when file does not exist.
+        if not dxf_path.exists():
+            return
+
+        # Delete the oldest backup if it exists to make room.
+        oldest = dxf_path.with_suffix(dxf_path.suffix + f".bak{max_backups}")
+        if oldest.exists():
+            try:
+                oldest.unlink()
+            except Exception:
+                logger.exception("Failed removing oldest backup: %s", oldest)
+
+        # Shift backups in descending order to avoid overwriting.
+        for idx in range(max_backups - 1, 0, -1):
+            src = dxf_path.with_suffix(dxf_path.suffix + f".bak{idx}")
+            dst = dxf_path.with_suffix(dxf_path.suffix + f".bak{idx + 1}")
+            if src.exists():
+                try:
+                    src.rename(dst)
+                except Exception:
+                    logger.exception(
+                        "Failed rotating backup %s -> %s", src, dst
+                    )
+
+        # Finally rename the current file to .bak1.
+        try:
+            dxf_path.rename(
+                dxf_path.with_suffix(dxf_path.suffix + ".bak1")
+            )
+        except Exception:
+            logger.exception("Failed creating first backup for %s", dxf_path)
+    except Exception:
+        # Never fail the export because of backup problems.
+        logger.exception(
+            "Unexpected error during backup rotation for %s", dxf_path
+        )
+
+
 def _iter_poly_vertices(
     ar: Iterable[Ar5Data],
     as5_offsets: list[int],
     points: list[No5Coord],
-) -> Iterable[list[tuple[float, float]]]:
+) -> Iterable[tuple[Ar5Data, list[tuple[float, float]]]]:
     """Yield vertex lists for each polyline described by AR5/AS5 tables.
 
     Args:
@@ -126,7 +178,7 @@ def _iter_poly_vertices(
 
         # Only lines with at least two vertices are meaningful in DXF.
         if len(vertices) >= 2:
-            yield vertices
+            yield entry, vertices
 
 
 def mapsys_to_dxf(
@@ -139,6 +191,7 @@ def mapsys_to_dxf(
     point_source_attrib: str = "SOURCE",
     point_z_attrib: str = "Z",
     block_scale: float = 1.0,
+    open_after_save: bool = False,
 ) -> Drawing:
     """Create a DXF document from parsed ``mapsys`` content.
 
@@ -246,7 +299,7 @@ def mapsys_to_dxf(
             )
 
     # Generate LWPolylines based on AR5/AS5 mapping to NO5 points.
-    for verts in _iter_poly_vertices(ar_list, as5_offsets, points):
+    for ar, verts in _iter_poly_vertices(ar_list, as5_offsets, points):
         try:
             closed = 0
             if len(verts) >= 2 and verts[0] == verts[-1]:
@@ -254,7 +307,11 @@ def mapsys_to_dxf(
                 verts = verts[:-1]
 
             msp.add_lwpolyline(
-                verts, format="xy", dxfattribs={"closed": closed}
+                verts, format="xy", dxfattribs={
+                    "closed": closed,
+                    "layer": "Mapsys-Poly",
+                    # TODO: don't know where poly layer is set
+                }
             )
         except Exception as e:
             logger.exception(
@@ -282,9 +339,15 @@ def mapsys_to_dxf(
             },
         )
 
+    # Zoom to extents to make the content visible by default.
+    zoom.extents(msp)
+
     # Save the result if a path was provided.
     if dxf_path is not None:
+        # Rotate existing DXF backups before overwriting the file.
+        _rotate_dxf_backups(dxf_path, max_backups=10)
         doc.saveas(dxf_path.as_posix())
-        os.startfile(dxf_path.as_posix())
+        if open_after_save:
+            os.startfile(dxf_path.as_posix())
 
     return doc

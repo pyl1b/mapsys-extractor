@@ -106,7 +106,7 @@ def _parse_cstrings_until_eof(
 
         # Decode as UTF-8. Empty strings are allowed.
         try:
-            text = raw.decode("utf-8")
+            text = raw.decode("windows-1250")
         except UnicodeDecodeError:
             logger.debug(
                 "Invalid UTF-8 sequence in TS5 at %d; using replacement",

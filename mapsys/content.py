@@ -44,8 +44,14 @@ def preprocess(name: str, mode: str) -> Any:
                 return
 
             if mode == PrepModels.MDB:
-                content = extract_access_db(str(file_path))
-                return func(self, content)
+                try:
+                    content = extract_access_db(str(file_path))
+                    return func(self, content)
+                except Exception:
+                    logger.exception(
+                        "Failed to extract content from %s", file_path
+                    )
+                    return
 
             text_mode = mode in (
                 PrepModels.TEXT_LINES,
@@ -121,6 +127,8 @@ class Content:
         Does not seem to corelate with the number of points, texts or
         poly-lines.
 
+        In a small file with 2 polylines three were two records.
+
         ```
         #pragma endian little
         #pragma magic [56 53 35 30] @ 0x00  // "VS50" at offset 0
@@ -134,9 +142,9 @@ class Content:
         };
 
         struct Data {
-            u8 first;
-            u8 second;
-            u8 third;
+            u8 first; // 0, 1, 2, 5, 9, 255
+            u8 second; // 0
+            u8 third; // 1
         };
 
         struct VS50File {
@@ -192,6 +200,8 @@ class Content:
     @preprocess("at5", mode=PrepModels.VA50)
     def process_at5(self, content: Any = None) -> None:
         """The data section seems to be a list of 3-byte records.
+
+        In a small file it was header-only.
 
         ```
         #pragma endian little
@@ -292,6 +302,12 @@ class Content:
 
     @preprocess("ns5", mode=PrepModels.VA50)
     def process_ns5(self, content: Any = None) -> None:
+        """Either a four-byte list of numbers or a 4-byte structure.
+
+        In a small file there were 6 records, all of them 1.
+
+        In a large file all but the fourth byte were non-null.
+        """
         pass
 
     @preprocess("ol5", mode=PrepModels.UNKNOWN)
@@ -312,10 +328,67 @@ class Content:
 
     @preprocess("qs5", mode=PrepModels.VA50)
     def process_qs5(self, content: Any = None) -> None:
+        """Array of two value. First is a byte that can be 1, 2 or 4.
+        Second is 32 bit integer that may be an offset or ID. Starts at 1
+        and same value can show up multiple times, but the combination seems
+        to be unique.
+        """
         pass
 
     @preprocess("qt5", mode=PrepModels.VA50)
     def process_qt5(self, content: Any = None) -> None:
+        """
+        In a short file the table contained 6 records.
+
+        Each record seems to be 14 bytes long. The data seem to have
+        a double pair at the top but other than that found few real numbers.
+        The bytes 9+10 seem to form an ever increasing number. The difference
+        between these values are between 0 and 121. There are, however, quite a
+        few numbers that appear two or more times, with the differentiator
+        being the first byte.
+
+        ```
+        #pragma endian little
+        #pragma magic [56 53 35 30] @ 0x00  // "VS50" at offset 0
+
+        import std.mem;
+
+        struct Header {
+            char signature[4];      // "VS50"
+            u32  int1[4];
+            u8 pad;
+            char signature2[5];      // "QT50"
+            u8 pad2[15];
+        };
+
+
+        struct Data {
+            u8 unk01; // 0 - 255
+            u8 unk02; // Not all values used, possibly flags
+            u8 unk03; // Not all values used, possibly flags
+            u8 unk04; // Not all values used, possibly flags
+            u8 unk05; // 0 - 255
+
+            u8 unk06; // 0, 1, 2, 4, 7, 8, 15, 16, 31, 32, 33, 63, 64
+            u8 unk07; // 0 - 255
+            u8 unk08; // 0, 1, 2, 4, 7, 8, 15, 16, 31, 32, 33, 63, 64
+            u16 unk09; // 0 - 255, increasing
+            // u8 unk10; // 0 - 255
+            u8 unk11; // 0, 1, 2, 5, 114
+            u8 unk12; // Vast majority 0. Saw a 2.
+            u8 unk13; // 0 - 254
+            u8 unk14; // 0 or 1. Vast majority 0
+        };
+
+
+        struct VS50File {
+            Header head;
+            Data data[while (!std::mem::eof())];
+        };
+
+        VS50File file @ 0x00;
+        ```
+        """
         pass
 
     @preprocess("ral", mode=PrepModels.TEXT_LINES)
@@ -328,6 +401,7 @@ class Content:
 
     @preprocess("te5", mode=PrepModels.VA50)
     def process_te5(self, content: Any = None) -> None:
+        """Text metadata without the actual string."""
         if isinstance(content, (bytes, bytearray)):
             _, self.t_meta = parse_te5(bytes(content))
         else:
