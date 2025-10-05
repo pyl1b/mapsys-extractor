@@ -212,9 +212,7 @@ def mapsys_to_dxf(
     "include_backup",
     default=False,
     show_default=True,
-    help=(
-        "Include directories named BACKUP during traversal when enabled."
-    ),
+    help=("Include directories named BACKUP during traversal when enabled."),
 )
 @click.option(
     "--dxf-template",

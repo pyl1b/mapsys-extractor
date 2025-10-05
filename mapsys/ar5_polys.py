@@ -17,7 +17,7 @@ ImHex reference (little-endian):
   - unk1: u32  (always 0)
   - vertex_offset: u32  (offset into the ASS table)
   - vertex_count: u16   (number of points in the poly)
-  - uniq_b: u32         (unique across file)
+  - lay_rec: u32        The index of the layer info record in AL5 table.
   - layer_count: u8     (observed correlations with UI)
   - unk6: u32           (mostly unique; some duplicates)
   - unk7: u8            (0, 1, 2)
@@ -64,7 +64,7 @@ class Ar5Data:
         unk1: Always 0 in observed files.
         vertex_offset: Offset inside the ASS table.
         vertex_count: Number of points in this polyline.
-        uniq_b: Value unique across the file.
+        lay_rec: Value unique across the file.
         layer_count: Layer counter/amount; correlates with UI observations.
         unk6: Mostly unique; some values may repeat.
         unk7: Small categorical value (0, 1, 2).
@@ -76,7 +76,7 @@ class Ar5Data:
     unk1: int
     vertex_offset: int
     vertex_count: int
-    uniq_b: int
+    lay_rec: int
     layer_count: int
     unk6: int
     unk7: int
@@ -103,9 +103,7 @@ def _parse_ar5_header(data: bytes, offset: int = 0) -> Tuple[Ar5Header, int]:
         raise ValueError("Buffer too small for AR5 header + pad")
 
     # Unpack header fields.
-    signature, i1, i2, i3, i4 = _AR5_HEADER_STRUCT.unpack_from(
-        data, offset
-    )
+    signature, i1, i2, i3, i4 = _AR5_HEADER_STRUCT.unpack_from(data, offset)
 
     # Validate signature.
     if signature != b"VA50":
@@ -146,7 +144,7 @@ def _parse_ar5_data_until_eof(
             unk1,
             vertex_offset,
             vertex_count,
-            uniq_b,
+            lay_rec,
             layer_count,
             unk6,
             unk7,
@@ -160,7 +158,7 @@ def _parse_ar5_data_until_eof(
                 unk1=unk1,
                 vertex_offset=vertex_offset,
                 vertex_count=vertex_count,
-                uniq_b=uniq_b,
+                lay_rec=lay_rec,
                 layer_count=layer_count,
                 unk6=unk6,
                 unk7=unk7,

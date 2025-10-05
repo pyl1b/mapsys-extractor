@@ -12,63 +12,80 @@ import logging
 import math
 import os
 from pathlib import Path
-
-# Internal knowledge of NO5 structure sizes to decode AS5 offsets.
-# Keep here to avoid importing private symbols from the parser module.
-from struct import Struct
 from typing import TYPE_CHECKING, Iterable
 
-from ezdxf.document import Drawing
+from attrs import define
 from ezdxf import zoom
+from ezdxf.document import Drawing
+from ezdxf.layouts.layout import Layout
+from ezdxf.lldxf.const import VALID_DXF_LINEWEIGHTS
 
 from mapsys.ar5_polys import Ar5Data
+from mapsys.dxf_colors import set_layer_color_from_index
 from mapsys.n05_points import No5Coord
 
 if TYPE_CHECKING:
+    from ezdxf.sections.table import LayerTable
+
     from mapsys.content import Content
 
-
 logger = logging.getLogger(__name__)
-
-
-_NO5_HEADER_STRUCT = Struct("<4s6IB")
-_NO5_COORD_STRUCT = Struct("<BIBIddfIB")
 
 BLOCK_SOURCE = "MapSys"
 BLOCK_ROTATION = 0.0
 ATTRIB_HEIGHT = 0.25
 
+LAYER_PREFIX = "MapSys"
+POINT_SUFFIX = "points"
+LINE_SUFFIX = "lines"
+TEXT_SUFFIX = "text"
 
-def _offset_to_point_index(offset: int) -> int | None:
-    """Translate a byte ``offset`` into a zero-based index in the NO5 table.
 
-    The AS5 file stores byte offsets that point into the NO5 coordinates table.
-    Those offsets are measured from the start of the NO5 file. The coordinates
-    table starts immediately after the NO5 header. Each record has a fixed
-    size, so the index can be computed by subtracting the header size and
-    dividing by the record size.
+@define
+class Builder:
+    mapsys: "Content"
+    point_block: str = "PCT3D"
+    point_name_attrib: str = "PTNAME"
+    point_source_attrib: str = "SOURCE"
+    point_z_attrib: str = "Z"
+    block_scale: float = 1.0
+    open_after_save: bool = False
+    random_colors: bool = False
+    segregate_by_object_type: bool = True
+
+
+def layer_name(mapsys: "Content", layer: int, suffix: str = "") -> str:
+    """Get the name of a layer.
+
+    Note that we rely on this pattern to detect mapsys layers in the DXF file.
 
     Args:
-        offset: Byte offset inside the NO5 file.
+        mapsys: The mapsys content.
+        layer: The layer index.
+        suffix: The suffix to add to the layer name.
 
     Returns:
-        The zero-based record index, or ``None`` if the offset is invalid.
+        The name of the layer. It may consist to up to 4 parts separated by
+        "-": LAYER_PREFIX, layer index, layer title, suffix. The title is only
+        added if it is not empty. The suffix is only added if it is not empty.
     """
+    parts = [LAYER_PREFIX, str(layer)]
+    while True:
+        if mapsys.pr5 is None:
+            break
+        if layer < 0 or layer >= len(mapsys.pr5.layers):
+            break
 
-    header_size = _NO5_HEADER_STRUCT.size
-    record_size = _NO5_COORD_STRUCT.size
+        map_layer = mapsys.pr5.layers[layer]
+        if not map_layer.title:
+            break
 
-    # Guard against offsets smaller than the header.
-    if offset < header_size:
-        return None
+        parts.append(map_layer.title)
+        break
 
-    relative = offset - header_size
-
-    # Ensure the offset aligns to the record boundary.
-    if relative % record_size != 0:
-        return None
-
-    return relative // record_size
+    if suffix:
+        parts.append(suffix)
+    return "-".join(parts)
 
 
 def _rotate_dxf_backups(dxf_path: Path, max_backups: int = 10) -> None:
@@ -110,9 +127,7 @@ def _rotate_dxf_backups(dxf_path: Path, max_backups: int = 10) -> None:
 
         # Finally rename the current file to .bak1.
         try:
-            dxf_path.rename(
-                dxf_path.with_suffix(dxf_path.suffix + ".bak1")
-            )
+            dxf_path.rename(dxf_path.with_suffix(dxf_path.suffix + ".bak1"))
         except Exception:
             logger.exception("Failed creating first backup for %s", dxf_path)
     except Exception:
@@ -124,21 +139,22 @@ def _rotate_dxf_backups(dxf_path: Path, max_backups: int = 10) -> None:
 
 def _iter_poly_vertices(
     ar: Iterable[Ar5Data],
-    as5_offsets: list[int],
+    verticels: list[int],
     points: list[No5Coord],
 ) -> Iterable[tuple[Ar5Data, list[tuple[float, float]]]]:
     """Yield vertex lists for each polyline described by AR5/AS5 tables.
 
     Args:
         ar: Parsed AR5 entries (one per polyline).
-        as5_offsets: Offsets table from AS5 (byte offsets into NO5 data).
+        verticels: Offsets table from AS5 (byte offsets into NO5 data).
         points: Parsed NO5 coordinates list.
 
     Yields:
-        Lists of ``(x, y)`` pairs for each line that has at least two points.
+        polyline metadata entry and the lists of ``(x, y)`` pairs
+        for each line that has at least two points.
     """
 
-    num_offsets = len(as5_offsets)
+    num_offsets = len(verticels)
     num_points = len(points)
 
     for entry in ar:
@@ -165,7 +181,7 @@ def _iter_poly_vertices(
         vertices: list[tuple[float, float]] = []
 
         # Build vertices by mapping offsets to point indices.
-        for off in as5_offsets[start:end]:
+        for off in verticels[start:end]:
             if off >= num_points:
                 logger.warning(
                     "Offset %d is out of range for %d points",
@@ -192,6 +208,8 @@ def mapsys_to_dxf(
     point_z_attrib: str = "Z",
     block_scale: float = 1.0,
     open_after_save: bool = False,
+    random_colors: bool = False,
+    segregate_by_object_type: bool = True,
 ) -> Drawing:
     """Create a DXF document from parsed ``mapsys`` content.
 
@@ -207,22 +225,18 @@ def mapsys_to_dxf(
         point_name_attrib: Attribute tag used to store the point name/number.
         point_source_attrib: Attribute tag used to store the point source.
         point_z_attrib: Attribute tag used to store the point z.
+
     Returns:
         The in-memory DXF document instance.
     """
+    added_layers = set()
 
     # Load DXF template into memory.
     # Prefer recover.readfile() for robust loading of DXF files.
     from ezdxf import recover as _recover  # local import to appease linters
 
-    # Use recover.readfile() for robust DXF loading.
     doc, _auditor = _recover.readfile(dxf_template.as_posix())
     msp = doc.modelspace()
-
-    # Extract data from the content object using duck typing.
-    points: list[No5Coord] = mapsys.points
-    ar_list: list[Ar5Data] = mapsys.p_meta
-    as5_offsets: list[int] = mapsys.v_offsets
 
     # Insert a block for each point with the NAME attribute set.
     block_exists = point_block in doc.blocks
@@ -238,39 +252,93 @@ def mapsys_to_dxf(
         attributes = set()
         for attdef in doc.blocks[point_block].query("ATTDEF"):
             attributes.add(attdef.dxf.tag)
-        if point_name_attrib not in attributes:
-            logger.warning(
-                (
-                    "Attribute '%s' not found in block '%s'; points will be "
-                    "drawn with no name attribute"
-                ),
-                point_name_attrib,
-                point_block,
-            )
-            point_name_attrib = ""
-        if point_source_attrib not in attributes:
-            logger.warning(
-                (
-                    "Attribute '%s' not found in block '%s'; points will be "
-                    "drawn with no source attribute"
-                ),
-                point_source_attrib,
-                point_block,
-            )
-            point_source_attrib = ""
-        if point_z_attrib not in attributes:
-            logger.warning(
-                (
-                    "Attribute '%s' not found in block '%s'; points will be "
-                    "drawn with no z attribute"
-                ),
-                point_z_attrib,
-                point_block,
-            )
-            point_z_attrib = ""
-    for pt in points:
+        for a_name in (point_name_attrib, point_source_attrib, point_z_attrib):
+            if a_name not in attributes:
+                logger.warning(
+                    (
+                        "Attribute '%s' not found in block '%s'; "
+                        "points will have no %s attribute"
+                    ),
+                    a_name,
+                    point_block,
+                    a_name,
+                )
+                a_name = ""
+
+    added_layers.update(
+        insert_points(
+            block_exists,
+            mapsys,
+            segregate_by_object_type,
+            msp,
+            point_block,
+            point_name_attrib,
+            point_source_attrib,
+            point_z_attrib,
+            block_scale,
+        )
+    )
+
+    added_layers.update(
+        insert_lines(
+            mapsys,
+            segregate_by_object_type,
+            msp,
+        )
+    )
+    added_layers.update(
+        insert_texts(
+            mapsys,
+            segregate_by_object_type,
+            msp,
+        )
+    )
+
+    # Get the layer table
+    for ly in added_layers:
+        doc.layers.add(ly)
+
+    if random_colors:
+        set_random_colors(doc.layers)
+    else:
+        set_mapsys_colors(doc.layers, mapsys)
+    set_line_weights(doc.layers, mapsys)
+
+    # Zoom to extents to make the content visible by default.
+    zoom.extents(msp)
+
+    # Save the result if a path was provided.
+    if dxf_path is not None:
+        # Rotate existing DXF backups before overwriting the file.
+        _rotate_dxf_backups(dxf_path, max_backups=10)
+        doc.saveas(dxf_path.as_posix())
+        if open_after_save:
+            os.startfile(dxf_path.as_posix())
+
+    return doc
+
+
+def insert_points(
+    block_exists: bool,
+    mapsys: "Content",
+    segregate_by_object_type: bool,
+    msp: "Layout",
+    point_block: "str",
+    point_name_attrib: "str",
+    point_source_attrib: "str",
+    point_z_attrib: str,
+    block_scale: "float",
+) -> set[str]:
+    added_layers = set()
+    for pt in mapsys.points:
         insert = (float(pt.east), float(pt.north))
         if block_exists:
+            ly_name = layer_name(
+                mapsys,
+                pt.layer,
+                suffix=POINT_SUFFIX if segregate_by_object_type else "",
+            )
+            added_layers.add(ly_name)
             br = msp.add_blockref(
                 point_block,
                 insert,
@@ -278,7 +346,7 @@ def mapsys_to_dxf(
                     "xscale": block_scale,
                     "yscale": block_scale,
                     "rotation": BLOCK_ROTATION,
-                    "layer": f"Mapsys-{pt.layer}",
+                    "layer": ly_name,
                 },
             )
             to_set = {}
@@ -297,21 +365,43 @@ def mapsys_to_dxf(
                 str(pt.pt_nr),
                 dxfattribs={"height": ATTRIB_HEIGHT, "insert": insert},
             )
+    return added_layers
 
+
+def insert_lines(
+    mapsys: "Content",
+    segregate_by_object_type: bool,
+    msp: "Layout",
+) -> set[str]:
+    added_layers = set()
+    ar_list: list[Ar5Data] = mapsys.p_meta
+    verticels: list[int] = mapsys.v_offsets
+    points: list[No5Coord] = mapsys.points
     # Generate LWPolylines based on AR5/AS5 mapping to NO5 points.
-    for ar, verts in _iter_poly_vertices(ar_list, as5_offsets, points):
+    for ar, verts in _iter_poly_vertices(ar_list, verticels, points):
         try:
             closed = 0
             if len(verts) >= 2 and verts[0] == verts[-1]:
                 closed = 1
                 verts = verts[:-1]
 
+            # Get the layer.
+            ly_index = mapsys.get_poly_layer(ar)
+            ly_name = layer_name(
+                mapsys,
+                ly_index,
+                suffix=LINE_SUFFIX if segregate_by_object_type else "",
+            )
+            added_layers.add(ly_name)
+
+            # Add the polyline.
             msp.add_lwpolyline(
-                verts, format="xy", dxfattribs={
+                verts,
+                format="xy",
+                dxfattribs={
                     "closed": closed,
-                    "layer": "Mapsys-Poly",
-                    # TODO: don't know where poly layer is set
-                }
+                    "layer": ly_name,
+                },
             )
         except Exception as e:
             logger.exception(
@@ -320,34 +410,182 @@ def mapsys_to_dxf(
                 e,
             )
             continue
+    return added_layers
+
+
+def insert_texts(
+    mapsys: "Content",
+    segregate_by_object_type: bool,
+    msp: "Layout",
+) -> set[str]:
+    added_layers = set()
 
     for text in mapsys.t_meta:
         string = mapsys.text_by_offset(text.offset)
         if string is None:
             logger.warning("Text not found for offset %d", text.offset)
             continue
+
+        ly_name = layer_name(
+            mapsys,
+            text.layer,
+            suffix=TEXT_SUFFIX if segregate_by_object_type else "",
+        )
+        added_layers.add(ly_name)
         msp.add_text(
             string,
             dxfattribs={
                 "height": text.height,
                 "insert": (float(text.east), float(text.north)),
                 "rotation": math.degrees(text.direction),
-                "layer": f"Mapsys-{text.layer}",
+                "layer": ly_name,
                 # "font": text.font,
                 # "align": text.align_east,
                 # "align2": text.align_north,
             },
         )
 
-    # Zoom to extents to make the content visible by default.
-    zoom.extents(msp)
+    return added_layers
 
-    # Save the result if a path was provided.
-    if dxf_path is not None:
-        # Rotate existing DXF backups before overwriting the file.
-        _rotate_dxf_backups(dxf_path, max_backups=10)
-        doc.saveas(dxf_path.as_posix())
-        if open_after_save:
-            os.startfile(dxf_path.as_posix())
 
-    return doc
+def set_random_colors(layers: "LayerTable") -> None:
+    """Set the color of the DXF layers to random colors.
+
+    Args:
+        layers: The layer table.
+    """
+    # Define a list of AutoCAD color indices to use (1–255 range)
+    # We'll skip grayscale-like colors and neutral tones.
+    # Common bright, distinct colors.
+    valid_colors = [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        10,
+        12,
+        14,
+        21,
+        23,
+        25,
+        30,
+        33,
+        41,
+        43,
+        50,
+        52,
+        60,
+        70,
+        80,
+        90,
+        100,
+        110,
+        120,
+        130,
+        140,
+        150,
+        160,
+        170,
+        180,
+        190,
+        200,
+        210,
+        220,
+        230,
+        240,
+        250,
+        253,
+        254,
+        255,
+    ]
+
+    # We'll going to repeat the colors in the valid_colors list if we run out.
+    available_colors = valid_colors.copy()
+
+    for layer in layers:
+        if layer.dxf.name == "0":
+            continue
+
+        if not available_colors:  # Refill if we run out
+            available_colors = valid_colors.copy()
+
+        color = available_colors.pop(0)  # Take next color
+        layer.dxf.color = color
+        if hasattr(layer.dxf, "true_color"):
+            layer.dxf.true_color = None
+
+
+def set_mapsys_colors(layers: "LayerTable", mapsys: "Content") -> None:
+    """Set the color for each layer from the MapSys PR5 data.
+
+    Args:
+        layers: The layer table.
+        mapsys: The MapSys content.
+    """
+    for layer in layers:
+        if not layer.dxf.name.startswith(f"{LAYER_PREFIX}-"):
+            continue
+        parts = layer.dxf.name.split("-")
+        src_layer = int(parts[1])
+        assert mapsys.pr5 is not None
+        if src_layer < 0 or src_layer >= len(mapsys.pr5.layers):
+            logger.warning("Invalid source layer index: %d", src_layer)
+            continue
+        set_layer_color_from_index(layer, mapsys.pr5.layers[src_layer].color)
+
+
+def set_line_weights(layers: "LayerTable", mapsys: "Content") -> None:
+    """Set the lineweight for each layer from the MapSys PR5 data.
+
+    Args:
+        layers: The layer table.
+        mapsys: The MapSys content.
+    """
+    for layer in layers:
+        if not layer.dxf.name.startswith(f"{LAYER_PREFIX}-"):
+            continue
+
+        parts = layer.dxf.name.split("-")
+        src_layer = int(parts[1])
+        assert mapsys.pr5 is not None
+        if src_layer < 0 or src_layer >= len(mapsys.pr5.layers):
+            logger.warning("Invalid source layer index: %d", src_layer)
+            continue
+
+        # Source weight is in range 0-255
+        layer.dxf.lineweight = lineweight_from_mapsys(
+            mapsys.pr5.layers[src_layer].weight
+        )
+
+
+def lineweight_from_mapsys(value: int) -> int:
+    """Map a MapSys line-weight in [0, 255] range to one of the DXF constants.
+
+    Args:
+        value: MapSys line-weight in [0, 255] range.
+
+    Returns:
+        The corresponding DXF lineweight constant.
+    """
+    if not isinstance(value, int):
+        raise TypeError(
+            f"value must be int in [0, 255], got {type(value).__name__}"
+        )
+    if value < 0 or value > 255:
+        raise ValueError(f"value must be in [0, 255], got {value}")
+
+    if 0 <= value <= 1:
+        return VALID_DXF_LINEWEIGHTS[1]
+    elif value == 2:
+        return VALID_DXF_LINEWEIGHTS[4]
+    elif value == 3:
+        return VALID_DXF_LINEWEIGHTS[8]
+    else:
+        value -= 4
+        to_split = VALID_DXF_LINEWEIGHTS[9:]
+
+        n = len(to_split)
+        bin_index = (value * n) // 253
+        return to_split[bin_index]

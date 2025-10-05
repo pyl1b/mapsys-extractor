@@ -7,10 +7,12 @@ from typing import Any
 
 from attrs import define, field
 
+from mapsys.al5_poly_layer import Al5Data, parse_al5
 from mapsys.ar5_polys import Ar5Data, parse_ar5
 from mapsys.as5_vertices import parse_as5
 from mapsys.mdb_support import extract_access_db
 from mapsys.n05_points import No5Coord, parse_no5
+from mapsys.pr5_main import Pr5File, parse_pr5
 from mapsys.te5_text_meta import Te5TextMeta, parse_te5
 from mapsys.ts5_text_store import Ts5Text, parse_ts5
 
@@ -110,6 +112,8 @@ class Content:
     t_meta: list["Te5TextMeta"] = field(factory=list)
     p_meta: list["Ar5Data"] = field(factory=list)
     v_offsets: list[int] = field(factory=list)
+    p_layers: list["Al5Data"] = field(factory=list)
+    pr5: "Pr5File | None" = field(default=None)
 
     offset_to_text: dict[int, str] = field(factory=dict, init=False)
 
@@ -120,42 +124,21 @@ class Content:
                 self.offset_to_text[text.offset] = text.text
         return self.offset_to_text.get(offset, None)
 
+    def get_poly_layer(self, p_meta: "Ar5Data") -> int:
+        if p_meta.lay_rec < 0 or p_meta.lay_rec >= len(self.p_layers):
+            return 0
+        result = self.p_layers[p_meta.lay_rec].layer
+        assert 0 <= result <= 255, f"Invalid poly layer index: {result}"
+        return result
+
     @preprocess("al5", mode=PrepModels.VA50)
     def process_al5(self, content: Any = None) -> None:
-        """The data section seems to be a list of 3-byte records.
-
-        Does not seem to corelate with the number of points, texts or
-        poly-lines.
-
-        In a small file with 2 polylines three were two records.
-
-        ```
-        #pragma endian little
-        #pragma magic [56 53 35 30] @ 0x00  // "VS50" at offset 0
-
-        import std.mem;
-
-        struct Header {
-            char signature[4];      // "VS50"
-            u32  int1[4];  int1[1] is always 768.
-            u8 pad;
-        };
-
-        struct Data {
-            u8 first; // 0, 1, 2, 5, 9, 255
-            u8 second; // 0
-            u8 third; // 1
-        };
-
-        struct VS50File {
-            Header head;
-            Data data[while (!std::mem::eof())];
-        };
-
-        VS50File file @ 0x00;
-        ```
-        """
-        pass
+        """AL5: per-poly layer table with 3-byte records."""
+        if isinstance(content, (bytes, bytearray)):
+            _, items = parse_al5(bytes(content))
+            self.p_layers = items
+        else:
+            assert False, f"Unknown content type: {type(content).__name__}"
 
     @preprocess("app", mode=PrepModels.TEXT_LINES)
     def process_app(self, content: Any = None) -> None:
@@ -316,7 +299,10 @@ class Content:
 
     @preprocess("pr5", mode=PrepModels.UNKNOWN)
     def process_pr5(self, content: Any = None) -> None:
-        pass
+        if isinstance(content, (bytes, bytearray)):
+            self.pr5 = parse_pr5(bytes(content))
+        else:
+            assert False, f"Unknown content type: {type(content).__name__}"
 
     @preprocess("prj", mode=PrepModels.TEXT_LINES)
     def process_prj(self, content: Any = None) -> None:
