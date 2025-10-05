@@ -5,9 +5,9 @@ All notable changes to this project will be documented in this file.
 The format is based on Keep a Changelog, and this project adheres to Semantic
 Versioning.
 
-## Unreleased
+## v0.0.1
 
-### Added (Unreleased)
+### Added
 
 - VA50/AR5 parser for polyline index (`mapsys.ar5_polys`) with unit tests.
 - Access MDB/ACCDB extractor module docs and tests
@@ -18,7 +18,7 @@ Versioning.
   error cases.
 - VA50/TE5 text metadata parser tests (`mapsys.parser.te5_text_meta`).
 
-### Changed (Unreleased)
+### Changed
 
 - Improve and complete documentation for `mapsys.parser.ar5_polys` module
   (Google-style docstrings for module, classes, and functions).
@@ -31,7 +31,7 @@ Versioning.
 - Complete Google-style docstrings and composed types in
   `mapsys.parser.te5_text_meta`. Fix signature validation to `b"VA50"`.
 
-### Documentation (Unreleased)
+### Documentation
 
 - Add full Google-style docstrings to AL5 parser (`mapsys.parser.al5_poly_layer`).
 - Add full Google-style docstrings to PR5 parser (`mapsys.parser.pr5_main`).
@@ -42,7 +42,7 @@ Versioning.
 - Add full Google-style docstrings to DXF export builder
   (`mapsys.dxf.to_dxf`).
 
-### Tests (Unreleased)
+### Tests
 
 - Add unit tests for AL5 parser (`tests/test_al5_poly_layer.py`).
 - Add unit tests for AR5 parser (`tests/test_ar5_polys.py`) covering header,
@@ -57,7 +57,7 @@ Versioning.
 - Add unit tests for content aggregation (`tests/test_content.py`) covering
   discovery, `get_poly_layer` and `text_by_offset`.
 
-### Features (Unreleased)
+### Features
 
 - XLSX export utility and CLI commands:
   - New module `mapsys/xl.py` with `export_to_xlsx(content, xlsx_path)` that

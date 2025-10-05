@@ -34,6 +34,7 @@
         "sdist",
         "Secuiesc",
         "setuptools",
+        "stdlib",
         "verticels",
         "verts",
         "xscale",

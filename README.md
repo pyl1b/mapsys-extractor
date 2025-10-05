@@ -1,4 +1,4 @@
-# mapsys
+# MapSys Extractor
 
 MapSys export and inspection tools for working with MapSys projects.
 
@@ -129,7 +129,7 @@ This installs the library and the `mapsys-extractor` command.
 Show the help to confirm it’s installed:
 
 ```bash
-find-stuff --help
+mapsys-ex --help
 ```
 
 Later, when you come back to use the tool again, just re-activate the
@@ -163,6 +163,9 @@ Show the available commands and options:
 ```bash
 mapsys --help
 ```
+
+All commands share logging flags: `--debug/--no-debug`, `--trace/--no-trace`,
+and `--log-file` to redirect logs. Version is available via `--version`.
 
 Export a single project from a directory that contains exactly one `.pr5`
 file:
@@ -248,16 +251,65 @@ High-level overview of the most relevant folders and files:
 - If `mapsys` is not found, make sure your virtual environment is activated
   and that you installed the package with `pip install -e .`.
 
-## Development (optional)
+## Development
 
 Install development tools and run checks:
 
+### Common tasks
+
 ```bash
-make init-d     # install with dev extras
-make test       # run mypy + pytest
-make lint       # ruff linting
-make delint     # ruff auto-fixes + format
+# Format
+make format
+
+# Lint
+make lint
+
+# Tests (type-check + pytest)
+make test
+
+# Fix simple lint issues automatically
+make delint
 ```
+
+The CLI entry point is `mapsys.__main__:cli` and can be invoked as:
+
+```bash
+python -m mapsys --help
+```
+
+### Project conventions
+
+- Typed code, small modules, clear names
+- Prefer stdlib and a minimal set of dependencies
+- Follow ruff formatting and linting configuration in `pyproject.toml`
+- Keep public APIs stable; if you change them, update `CHANGELOG.md`
+
+### Release
+
+On the local machine create a package and test it.
+
+```bash
+pip install build twine
+python -m build
+twine check dist/*
+```
+
+Change `## [Unreleased]` to the name of the new version in `CHANGELOG.md`,
+then create a commit, then create a new tag and push it to GitHub:
+
+```bash
+git add .
+git commit -m "Release version 0.1.0"
+
+git tag -a v0.1.0 -m "Release version 0.1.0"
+
+git push origin v0.1.0
+# or
+git push origin --tags
+```
+
+In the GitHub repository page create a new Release. This will trigger the
+workflow for publishing in PyPi.
 
 ## License and attribution
 
