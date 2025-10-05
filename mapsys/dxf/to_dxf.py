@@ -1,9 +1,13 @@
 """DXF export utilities.
 
-This module provides a function that converts parsed ``mapsys`` content into a
-DXF file by using a template DXF. It inserts block references for all points
-and generates polylines based on AR5/AS5 indices.
+This module converts parsed ``mapsys`` content into a DXF document by using
+an existing DXF template as a base. It inserts block references for all
+points, generates polylines based on AR5/AS5 indices and writes text
+entities from TE5/TS5.
 
+The main entry-point is :meth:`Builder.convert` which loads the template,
+invokes the individual insert operations, applies colors and line weights,
+and optionally saves the resulting document to disk.
 """
 
 from __future__ import annotations
@@ -93,9 +97,21 @@ class Builder:
         """Construct a Builder and run the conversion.
 
         Args:
-            mapsys: Parsed content holding points and polyline data.
+            mapsys: Parsed content holding points, polylines and texts.
             dxf_template: Path to the template DXF file to load.
             dxf_path: Optional path to save the resulting DXF.
+            point_block: Name of the block to insert for points.
+            point_name_attrib: ATTDEF tag that stores the point number.
+            point_source_attrib: ATTDEF tag that stores the data source.
+            point_z_attrib: ATTDEF tag that stores the elevation (Z) value.
+            block_scale: Uniform scale applied to point block inserts.
+            open_after_save: If True, attempt to open the saved DXF.
+            random_colors: If True, assign random colors to layers.
+            segregate_by_object_type: If True, suffix layer names with the
+                object type (``points``/``lines``/``text``).
+
+        Returns:
+            The in-memory DXF document instance.
         """
         builder = cls(
             mapsys=mapsys,
@@ -274,7 +290,8 @@ class Builder:
 
         The function loads a template DXF, inserts a block reference for every
         point with its name (``point_name_attrib``) set to the point number,
-        and draws polylines derived from the AR5/AS5 indices.
+        draws polylines derived from the AR5/AS5 indices and writes text
+        entities when available.
 
         Args:
             dxf_template: Path to the template DXF file to load.
@@ -603,6 +620,10 @@ class Builder:
 
         Returns:
             The corresponding DXF lineweight constant.
+
+        Throws:
+            TypeError: If ``value`` is not an ``int``.
+            ValueError: If ``value`` is outside the ``[0, 255]`` range.
         """
         if not isinstance(value, int):
             raise TypeError(

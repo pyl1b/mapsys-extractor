@@ -1,3 +1,30 @@
+"""High-level content loader for MapSys companion files.
+
+This module orchestrates loading and preprocessing of the various files that
+share the same base name as the selected MapSys file. It provides a
+``Content`` value object that aggregates parsed data from multiple VA50
+binary tables (e.g., NO5 points, TS5 text store, TE5 text metadata, AR5/AL5
+polyline tables) as well as a few text- and CSV-based sidecar files.
+
+Design overview:
+
+- The ``preprocess`` decorator encapsulates the common boilerplate of
+  locating the companion file, reading it in the appropriate mode, and
+  adapting the raw bytes or text lines to the handler's expected input.
+- Each ``process_*`` method parses a specific file type and stores the
+  results on the ``Content`` instance.
+- ``Content.create`` collects all non-empty sibling files that share the same
+  stem with ``main_file`` and invokes all processors in a fixed order.
+
+Logging is used throughout to keep the code side-effect free while still
+surfacing diagnostics (missing files, empty files, decoding problems, etc.).
+
+The loader favors robustness and isolation: individual processors are allowed
+to fail without taking down the entire loading pipeline. For example, if an
+optional sidecar is missing, the decorator will log and return early rather
+than raising.
+"""
+
 import csv
 import logging
 from enum import StrEnum
@@ -20,6 +47,8 @@ logger = logging.getLogger(__name__)
 
 
 class PrepModels(StrEnum):
+    """Input modes understood by the ``preprocess`` decorator."""
+
     TEXT_LINES = "text-lines"
     VA50 = "va50"
     CSV = "csv"
@@ -29,11 +58,31 @@ class PrepModels(StrEnum):
 
 
 def preprocess(name: str, mode: str) -> Any:
-    """Preprocess a file.
+    """Decorator that injects companion file content into a handler.
+
+    The decorator looks up a sibling file based on ``name`` (e.g., ``"no5"``),
+    reads it using a strategy determined by ``mode``, and then calls the
+    wrapped ``process_*`` method with the prepared content.
+
+    - ``TEXT_LINES``: open as UTF-8 text and pass a list of lines
+    - ``CSV``: open as UTF-8 text and pass a CSV row iterator
+    - ``ASSIGN``: open as UTF-8 text and pass a ``dict`` built from ``k=v``
+      lines
+    - ``VA50``: open as binary and pass raw bytes
+    - ``UNKNOWN``: open as binary and pass raw bytes unchanged
+    - ``MDB``: call ``extract_access_db`` and pass a ``dict`` of tables
 
     Args:
-        name: The name of the file.
-        mode: The mode of the file.
+        name: Lowercase file key without dot (e.g., ``"no5"``).
+        mode: One of :class:`PrepModels` determining how the file is read.
+
+    Returns:
+        A decorator that wraps a ``process_*`` method to auto-supply content.
+
+    Throws:
+        No exception is raised for missing or empty files; these are logged
+        and the wrapped function is not called. For MDB extraction, any
+        exception from the extractor is logged and suppressed as well.
     """
 
     def decorator(func: Any) -> Any:
@@ -102,7 +151,22 @@ def preprocess(name: str, mode: str) -> Any:
 
 @define
 class Content:
-    """Content of a file."""
+    """Aggregated content parsed from MapSys companion files.
+
+    Attributes:
+        main_file: The user-selected file used to derive the file stem.
+        files: Mapping of uppercase extensions (e.g., ``"NO5"``) to paths of
+            discovered non-empty sibling files.
+        points: Parsed NO5 point records.
+        texts: Parsed TS5 text entries.
+        t_meta: Parsed TE5 text metadata entries.
+        p_meta: Parsed AR5 polyline metadata entries.
+        v_offsets: Parsed AS5 vertex offsets list.
+        p_layers: Parsed AL5 per-poly layer records.
+        pr5: Parsed PR5 file structure if present, otherwise ``None``.
+        offset_to_text: Internal cache mapping TS5 offsets to strings used by
+            :meth:`text_by_offset`.
+    """
 
     main_file: Path
     files: dict[str, Path]
@@ -118,13 +182,36 @@ class Content:
     offset_to_text: dict[int, str] = field(factory=dict, init=False)
 
     def text_by_offset(self, offset: int) -> str | None:
-        """Get the text by its offset in the TS5 file."""
+        """Return the TS5 string stored at ``offset``.
+
+        Builds a cache on first use from ``self.texts``. Offsets are relative
+        to the beginning of the TS5 string block (i.e., right after the TS5
+        header), matching the values referenced by TE5 metadata.
+
+        Args:
+            offset: String-block-relative byte offset.
+
+        Returns:
+            The decoded string if present, otherwise ``None``.
+        """
         if not self.offset_to_text:
             for text in self.texts:
                 self.offset_to_text[text.offset] = text.text
         return self.offset_to_text.get(offset, None)
 
     def get_poly_layer(self, p_meta: "Ar5Data") -> int:
+        """Resolve the display layer for an AR5 polyline record.
+
+        Falls back to ``0`` if the ``lay_rec`` index is outside the bounds of
+        the available AL5 records. Otherwise returns the ``layer`` value from
+        the corresponding AL5 entry.
+
+        Args:
+            p_meta: One AR5 record.
+
+        Returns:
+            Layer index (0..255). Values are asserted to be in range.
+        """
         if p_meta.lay_rec < 0 or p_meta.lay_rec >= len(self.p_layers):
             return 0
         result = self.p_layers[p_meta.lay_rec].layer
@@ -133,7 +220,14 @@ class Content:
 
     @preprocess("al5", mode=PrepModels.VA50)
     def process_al5(self, content: Any = None) -> None:
-        """AL5: per-poly layer table with 3-byte records."""
+        """AL5: per-poly layer table with 3-byte records.
+
+        Args:
+            content: Raw bytes of an AL5 VA50 file.
+
+        Returns:
+            None. Populates ``self.p_layers``.
+        """
         if isinstance(content, (bytes, bytearray)):
             _, items = parse_al5(bytes(content))
             self.p_layers = items
@@ -147,6 +241,14 @@ class Content:
 
     @preprocess("ar5", mode=PrepModels.VA50)
     def process_ar5(self, content: Any = None) -> None:
+        """AR5: polyline table.
+
+        Args:
+            content: Raw bytes of an AR5 VA50 file.
+
+        Returns:
+            None. Populates ``self.p_meta``.
+        """
         if isinstance(content, (bytes, bytearray)):
             _, self.p_meta = parse_ar5(bytes(content))
         else:
@@ -158,22 +260,28 @@ class Content:
         stored in the AR table.
 
         #pragma endian little
-        #pragma magic [56 53 35 30] @ 0x00  // "VS50" at offset 0
+        #pragma magic [56 53 35 30] @ 0x00  // "VA50" at offset 0
 
         import std.mem;
 
         struct Header {
-            char signature[4];      // "VS50"
+            char signature[4];      // "VA50"
             u32  int1[5];
             u8 pad;
         };
 
-        struct VS50File {
+        struct VA50File {
             Header head;
             u32 data[while (!std::mem::eof())];
         };
 
-        VS50File file @ 0x00;
+        VA50File file @ 0x00;
+
+        Args:
+            content: Raw bytes of an AS5 VA50/VA50 file.
+
+        Returns:
+            None. Populates ``self.v_offsets``.
         """
         if isinstance(content, (bytes, bytearray)):
             _, self.v_offsets = parse_as5(bytes(content))
@@ -188,7 +296,7 @@ class Content:
 
         ```
         #pragma endian little
-        #pragma magic [56 53 35 30] @ 0x00  // "VS50" at offset 0
+        #pragma magic [56 53 35 30] @ 0x00  // "VA50" at offset 0
 
         import std.mem;
 
@@ -200,17 +308,17 @@ class Content:
 
 
         struct Header {
-            char signature[4];      // "VS50"
+            char signature[4];      // "VA50"
             u8 unk;
             u32 pad[4];
         };
 
-        struct VS50File {
+        struct VA50File {
             Header head;
             Data data[while (!std::mem::eof())];
         };
 
-        VS50File file @ 0x00;
+        VA50File file @ 0x00;
         ```
         """
         pass
@@ -277,7 +385,14 @@ class Content:
 
     @preprocess("no5", mode=PrepModels.VA50)
     def process_no5(self, content: Any = None) -> None:
-        """Points."""
+        """NO5: points table.
+
+        Args:
+            content: Raw bytes of a NO5 VA50 file.
+
+        Returns:
+            None. Populates ``self.points``.
+        """
         if isinstance(content, (bytes, bytearray)):
             _, self.points = parse_no5(bytes(content))
         else:
@@ -299,6 +414,14 @@ class Content:
 
     @preprocess("pr5", mode=PrepModels.UNKNOWN)
     def process_pr5(self, content: Any = None) -> None:
+        """PR5: main project file.
+
+        Args:
+            content: Raw bytes of a PR5 file.
+
+        Returns:
+            None. Populates ``self.pr5``.
+        """
         if isinstance(content, (bytes, bytearray)):
             self.pr5 = parse_pr5(bytes(content))
         else:
@@ -335,12 +458,12 @@ class Content:
 
         ```
         #pragma endian little
-        #pragma magic [56 53 35 30] @ 0x00  // "VS50" at offset 0
+        #pragma magic [56 53 35 30] @ 0x00  // "VA50" at offset 0
 
         import std.mem;
 
         struct Header {
-            char signature[4];      // "VS50"
+            char signature[4];      // "VA50"
             u32  int1[4];
             u8 pad;
             char signature2[5];      // "QT50"
@@ -367,12 +490,12 @@ class Content:
         };
 
 
-        struct VS50File {
+        struct VA50File {
             Header head;
             Data data[while (!std::mem::eof())];
         };
 
-        VS50File file @ 0x00;
+        VA50File file @ 0x00;
         ```
         """
         pass
@@ -387,7 +510,14 @@ class Content:
 
     @preprocess("te5", mode=PrepModels.VA50)
     def process_te5(self, content: Any = None) -> None:
-        """Text metadata without the actual string."""
+        """TE5: text metadata without the actual string.
+
+        Args:
+            content: Raw bytes of a TE5 VA50 file.
+
+        Returns:
+            None. Populates ``self.t_meta``.
+        """
         if isinstance(content, (bytes, bytearray)):
             _, self.t_meta = parse_te5(bytes(content))
         else:
@@ -399,7 +529,14 @@ class Content:
 
     @preprocess("ts5", mode=PrepModels.VA50)
     def process_ts5(self, content: Any = None) -> None:
-        """Text storage."""
+        """TS5: text storage.
+
+        Args:
+            content: Raw bytes of a TS5 VA50 file.
+
+        Returns:
+            None. Populates ``self.texts``.
+        """
         if isinstance(content, (bytes, bytearray)):
             _, self.texts = parse_ts5(bytes(content))
         else:
@@ -407,7 +544,22 @@ class Content:
 
     @classmethod
     def create(cls, main_file: Path) -> "Content | None":
-        """Create a Content object from a main file."""
+        """Create and populate a ``Content`` instance for ``main_file``.
+
+        The function discovers all non-empty files that share the same stem as
+        ``main_file`` and stores them in ``files`` keyed by uppercase
+        extension (e.g., ``{"NO5": Path(...)}"). It then calls all
+        ``process_*`` methods to populate the structured fields. Missing files
+        are logged and skipped.
+
+        Args:
+            main_file: Path to any file in the MapSys set; only its stem is
+                used for discovery.
+
+        Returns:
+            A populated :class:`Content` or ``None`` if no sibling files were
+            found.
+        """
         main_key = main_file.stem.upper()
         collected = {}
         for file_path in main_file.parent.glob(f"{main_key}.*"):

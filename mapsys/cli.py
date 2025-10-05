@@ -153,8 +153,8 @@ def mapsys_to_dxf(
         point_block: Name of the block used for point symbols.
         point_name_attrib: Attribute tag used to store the point name/number.
     """
-    from mapsys.parser.content import Content
     from mapsys.dxf.to_dxf import Builder
+    from mapsys.parser.content import Content
 
     root_path = Path(root)
 
@@ -271,8 +271,8 @@ def mapsys_dir_to_dxf(
     Directories are processed only if they contain at least one ``.pr5`` file.
     """
 
-    from mapsys.parser.content import Content
     from mapsys.dxf.to_dxf import Builder
+    from mapsys.parser.content import Content
 
     root_path = Path(root)
 

@@ -1,12 +1,12 @@
-"""NO5/VS50 binary structures and parser.
+"""NO5/VA50 binary structures and parser.
 
-This module defines typed data structures for the VS50 (NO5) binary format
+This module defines typed data structures for the VA50 (NO5) binary format
 and provides a parser that can read these structures from a ``bytes`` object.
 
 The layout is inspired by the ImHex pattern shown in the codebase:
 
 Header (little-endian):
-- signature: 4 bytes, must be ``b"VS50"``
+- signature: 4 bytes, must be ``b"VA50"``
 - int1: 6 x ``u32`` values (purpose unknown)
 - pad1: 1 x ``u8`` (usually 0)
 
@@ -32,6 +32,10 @@ from typing import List, Tuple
 logger = logging.getLogger(__name__)
 
 
+# Composed types
+Int6 = Tuple[int, int, int, int, int, int]
+
+
 # Binary struct formats (little-endian)
 _HEADER_STRUCT = struct.Struct("<4s6IB")
 _COORD_STRUCT = struct.Struct("<BIBIddfIB")
@@ -39,22 +43,22 @@ _COORD_STRUCT = struct.Struct("<BIBIddfIB")
 
 @dataclass(frozen=True)
 class No5Header:
-    """VS50/NO5 file header.
+    """VA50/NO5 file header.
 
     Attributes:
-        signature: File signature, expected to be ``b"VS50"``.
+        signature: File signature, expected to be ``b"VA50"``.
         int1: Six 32-bit unsigned integers with unknown purpose.
         pad1: Single 8-bit value (usually 0).
     """
 
     signature: bytes
-    int1: Tuple[int, int, int, int, int, int]
+    int1: Int6
     pad1: int
 
 
 @dataclass(frozen=True)
 class No5Coord:
-    """Single coordinate record from a VS50/NO5 file.
+    """Single coordinate record from a VA50/NO5 file.
 
     Attributes:
         type: Record type (0 break point, 16 node, 5 special/unknown).
@@ -90,7 +94,7 @@ def _parse_header(data: bytes, offset: int = 0) -> Tuple[No5Header, int]:
     Returns:
         Tuple of the parsed ``No5Header`` and the new offset after the header.
 
-    Raises:
+    Throws:
         ValueError: If the buffer is too small or the signature is invalid.
     """
 
@@ -173,7 +177,7 @@ def _parse_coords(data: bytes, offset: int) -> Tuple[List[No5Coord], int]:
 
 
 def parse_no5(data: bytes) -> Tuple[No5Header, List[No5Coord]]:
-    """Parse a VS50/NO5 file from bytes.
+    """Parse a VA50/NO5 file from bytes.
 
     Args:
         data: File content as bytes.

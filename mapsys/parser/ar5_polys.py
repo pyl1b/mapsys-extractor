@@ -1,13 +1,14 @@
-"""VS50/AR5 polylines index parser.
+"""Parse VA50/AR5 polyline index files.
 
-This module defines typed data structures for the VS50-based AR5 format and
+This module defines typed data structures for the VA50-based AR5 format and
 provides a parser that reads the header and a sequence of ``Data`` records
-until EOF, as described by the given ImHex pattern.
+until EOF. The structure below follows the observed layout and an ImHex
+pattern used during reverse engineering.
 
 ImHex reference (little-endian):
 
 - Header:
-  - signature: char[4] == b"VS50"
+  - signature: char[4] == b"VA50"
   - int1: u32[4]
   - pad: u8
 - File pad: u8[9]
@@ -44,9 +45,8 @@ class Ar5Header:
     """AR5 file header.
 
     Attributes:
-        signature: File signature, expected to be ``b"VS50"``.
+        signature: File signature, expected to be ``b"VA50"``.
         int1: Four 32-bit unsigned integers (purpose unknown).
-        pad: Single 8-bit value (usually 0).
     """
 
     signature: bytes
@@ -64,7 +64,7 @@ class Ar5Data:
         unk1: Always 0 in observed files.
         vertex_offset: Offset inside the ASS table.
         vertex_count: Number of points in this polyline.
-        lay_rec: Value unique across the file.
+        lay_rec: Index of the layer info record in the AL5 table.
         layer_count: Layer counter/amount; correlates with UI observations.
         unk6: Mostly unique; some values may repeat.
         unk7: Small categorical value (0, 1, 2).
@@ -178,13 +178,13 @@ def _parse_ar5_data_until_eof(
 
 
 def parse_ar5(data: bytes) -> Tuple[Ar5Header, List[Ar5Data]]:
-    """Parse an AR5 VS50 file from bytes.
+    """Parse an AR5 VA50 file from bytes.
 
     Args:
         data: File content as bytes.
 
     Returns:
-        Tuple of (``Ar5Header``, list of ``Ar5Data`` records).
+        Tuple of (``Ar5Header`` and list of ``Ar5Data`` records).
     """
 
     # Parse header and file-level pad.

@@ -1,8 +1,9 @@
 """PR5 (MapSys) binary structures and parser.
 
-This module implements a typed parser for ``.pr5`` files following the
-ImHex pattern provided. The file is little-endian and starts with the
-signature ``b"MapSys\x00"``.
+This module parses binary ``.pr5`` files into typed Python data classes.
+The format is little-endian and starts with the signature ``b"MapSys"``
+followed by structured content discovered from reverse engineering and an
+ImHex pattern.
 
 The layout (simplified) is:
 
@@ -17,10 +18,10 @@ The layout (simplified) is:
 - 256-byte ``mdb`` string buffer
 - 256-byte zero buffer
 
-All fixed-size C strings are stored as zero-terminated byte arrays.
-This parser decodes string fields using Windows-1250, stripping any
-trailing NUL (0x00) and whitespace. Unknown/opaque byte areas are kept
-as ``bytes``.
+All fixed-size C strings are stored as zero-terminated byte arrays. This
+parser decodes string fields using Windows-1250, stripping any trailing
+NUL (0x00) and whitespace. Unknown/opaque byte areas are kept as
+``bytes`` to preserve information for future analysis.
 """
 
 from __future__ import annotations
@@ -39,22 +40,30 @@ logger = logging.getLogger(__name__)
 
 
 def _decode_c_string(buf: bytes) -> str:
-    """Decode a fixed-size zero-terminated byte buffer to text.
+    """Decode a fixed-size zero-terminated byte buffer to a Python ``str``.
+
+    The function looks for the first NUL byte and decodes the substring up to
+    that position using Windows-1250. If decoding fails for any reason, it
+    falls back to UTF-8 with replacement errors handling.
 
     Args:
-        buf: The raw bytes containing the string and possible padding.
+        buf: Raw bytes containing the string and padding NULs.
 
     Returns:
-        Decoded text with trailing NUL and whitespace removed.
+        Text with trailing NUL and whitespace removed.
     """
 
     try:
         end = buf.find(0)
         if end == -1:
             end = len(buf)
+
+        # Decode with Windows-1250 as observed in the original files.
         return buf[:end].decode("windows-1250", errors="replace").strip()
     except Exception:
         logger.debug("Failed decoding PR5 string; using replacement")
+
+        # Fallback to UTF-8 to guarantee a string result.
         return buf.rstrip(b"\x00").decode("utf-8", errors="replace").strip()
 
 
@@ -103,7 +112,12 @@ class LayerAttribute:
 
 @dataclass(frozen=True)
 class Layer:
-    """One PR5 layer with title, style and 9 attributes."""
+    """One PR5 layer with title, style and 9 attributes.
+
+    The layer contains four leading flag/byte values, a title, two style
+    bytes (``color`` and ``weight``), two opaque content areas, and nine
+    attribute records describing text rendering or alignment parameters.
+    """
 
     first_four: Tuple[int, int, int, int]
     title: str
@@ -116,7 +130,11 @@ class Layer:
 
 @dataclass(frozen=True)
 class TheNine:
-    """Six bytes of unknown data, repeated nine times in the header."""
+    """Six bytes of unknown data, repeated nine times in the header.
+
+    The exact semantics are not known. They are kept as separate bytes to
+    avoid losing information.
+    """
 
     b0: int
     b1: int
@@ -128,7 +146,12 @@ class TheNine:
 
 @dataclass(frozen=True)
 class AfterLayers:
-    """Record following the 256 layers."""
+    """Record following the 256 layers.
+
+    The record includes a 32-bit field ``first_four``, a 16-bit field
+    ``zero_two`` (often zero in samples), a textual name, two boolean-like
+    flags and a 24-byte opaque area labeled ``unk``.
+    """
 
     first_four: int
     zero_two: int
@@ -213,7 +236,11 @@ def _parse_header(data: bytes, offset: int = 0) -> Tuple[Header, int]:
         offset: Offset where the header starts.
 
     Returns:
-        Tuple of the parsed header and new offset after the header.
+        A tuple of the parsed :class:`Header` and the offset immediately after
+        the header block.
+
+    Throws:
+        ValueError: If the buffer is too small or the signature is invalid.
     """
 
     if len(data) - offset < _HEADER_PART1.size + (_THE_NINE.size * 9) + 1:
@@ -298,7 +325,15 @@ def _parse_header(data: bytes, offset: int = 0) -> Tuple[Header, int]:
 
 
 def _parse_layer(data: bytes, offset: int) -> Tuple[Layer, int]:
-    """Parse one ``Layer`` record."""
+    """Parse one ``Layer`` record.
+
+    Args:
+        data: Entire file buffer.
+        offset: Offset at which the layer starts.
+
+    Returns:
+        A tuple of the parsed :class:`Layer` and the new offset.
+    """
 
     (
         f1,
@@ -358,7 +393,15 @@ def _parse_layer(data: bytes, offset: int) -> Tuple[Layer, int]:
 
 
 def _parse_after_layers(data: bytes, offset: int) -> Tuple[AfterLayers, int]:
-    """Parse one ``AfterLayers`` record."""
+    """Parse one ``AfterLayers`` record.
+
+    Args:
+        data: Entire file buffer.
+        offset: Offset at which the record starts.
+
+    Returns:
+        A tuple of the parsed :class:`AfterLayers` and the new offset.
+    """
 
     (
         first_four,
@@ -385,6 +428,15 @@ def _parse_after_layers(data: bytes, offset: int) -> Tuple[AfterLayers, int]:
 
 
 def _parse_font_entry(data: bytes, offset: int) -> Tuple[FontEntry, int]:
+    """Parse a single font table entry.
+
+    Args:
+        data: Entire file buffer.
+        offset: Offset at which the entry starts.
+
+    Returns:
+        A tuple of the parsed :class:`FontEntry` and the new offset.
+    """
     (raw13,) = _FONT_ENTRY_RAW.unpack_from(data, offset)
     offset += _FONT_ENTRY_RAW.size
     name = _decode_c_string(raw13[:12])
@@ -394,11 +446,18 @@ def _parse_font_entry(data: bytes, offset: int) -> Tuple[FontEntry, int]:
 def parse_pr5(data: bytes) -> Pr5File:
     """Parse a PR5 file from bytes.
 
+    This function orchestrates parsing of the header, layers, after-layers
+    and the trailing sections into a :class:`Pr5File` value object.
+
     Args:
         data: File content as bytes.
 
     Returns:
         Fully parsed :class:`Pr5File` instance.
+
+    Throws:
+        ValueError: If the buffer is too small for any of the required blocks
+        or if the header signature is invalid.
     """
 
     # Header

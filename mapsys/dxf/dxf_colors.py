@@ -1,15 +1,46 @@
-"""Embedded 256-color palette + ezdxf helpers."""
+"""Embedded palette and ezdxf helper utilities.
+
+This module embeds an index-aligned color palette and provides small
+utilities to apply colors to ezdxf layers and entities using True Color.
+
+The palette is intended to be stable across the project, but its size can
+vary if additional indices are needed. Always validate indices against the
+current palette size using the provided helpers.
+"""
 
 from __future__ import annotations
+
+from typing import Protocol, runtime_checkable
 
 from ezdxf.colors import rgb2int
 from ezdxf.entities.dxfgfx import DXFGraphic
 from ezdxf.entities.layer import Layer
 
+# Composed types used by this module.
+PaletteColor = tuple[int, int, int]
+Palette = list[PaletteColor]
+
+
+class _DXFLike(Protocol):
+    """Minimal DXF container with a True Color field."""
+
+    true_color: int
+
+
+@runtime_checkable
+class SupportsTrueColor(Protocol):
+    """Protocol for ezdxf-like objects that expose a ``dxf.true_color``.
+
+    This is satisfied by ezdxf `Layer` and any `DXFGraphic` entity.
+    """
+
+    dxf: _DXFLike
+
+
 # Index-aligned palette: PALETTE_256[i] == (R, G, B)
 # This was manually extracted but MapSys lets the user change colors for each
 # palette index, so it must be stored somewhere.
-PALETTE_256: list[tuple[int, int, int]] = [
+PALETTE_256: Palette = [
     (0, 0, 128),
     (0, 128, 0),
     (0, 128, 128),
@@ -269,14 +300,17 @@ PALETTE_256: list[tuple[int, int, int]] = [
 ]
 
 
-def get_palette_rgb(index: int) -> tuple[int, int, int]:
-    """Return (R, G, B) for a 0..255 palette index.
+def get_palette_rgb(index: int) -> PaletteColor:
+    """Return the palette color for a palette index.
 
     Args:
-        index: The palette index.
+        index: The palette index to resolve.
 
     Returns:
-        the (R, G, B) color.
+        The color as a 3-tuple ``(R, G, B)``.
+
+    Throws:
+        ValueError: If ``index`` is outside ``0..len(PALETTE_256)-1``.
     """
     if not (0 <= index < len(PALETTE_256)):
         raise ValueError(f"Index must be in 0..255, got {index}")
@@ -284,16 +318,20 @@ def get_palette_rgb(index: int) -> tuple[int, int, int]:
 
 
 def set_layer_color_from_index(
-    layer: "Layer", index: int
-) -> tuple[int, int, int]:
-    """Set the ezdxf layer's True Color from the embedded palette index.
+    layer: Layer | SupportsTrueColor, index: int
+) -> PaletteColor:
+    """Set the ezdxf layer's True Color from a palette index.
 
     Args:
-        layer: The ezdxf layer.
-        index: The palette index.
+        layer: The ezdxf layer to modify (or any object exposing
+            ``dxf.true_color``).
+        index: The palette index to look up.
 
     Returns:
-        the (R, G, B) applied.
+        The applied color as ``(R, G, B)``.
+
+    Throws:
+        ValueError: If ``index`` is invalid for the current palette.
     """
     r, g, b = get_palette_rgb(index)
     layer.dxf.true_color = rgb2int((r, g, b))
@@ -301,16 +339,20 @@ def set_layer_color_from_index(
 
 
 def set_entity_color_from_index(
-    entity: "DXFGraphic", index: int
-) -> tuple[int, int, int]:
-    """Set the ezdxf entity's True Color from the embedded palette index.
+    entity: DXFGraphic | SupportsTrueColor, index: int
+) -> PaletteColor:
+    """Set the ezdxf entity's True Color from a palette index.
 
     Args:
-        entity: The ezdxf entity.
-        index: The palette index.
+        entity: The ezdxf entity to modify (or any object exposing
+            ``dxf.true_color``).
+        index: The palette index to look up.
 
     Returns:
-        the (R, G, B) applied.
+        The applied color as ``(R, G, B)``.
+
+    Throws:
+        ValueError: If ``index`` is invalid for the current palette.
     """
     r, g, b = get_palette_rgb(index)
     entity.dxf.true_color = rgb2int((r, g, b))

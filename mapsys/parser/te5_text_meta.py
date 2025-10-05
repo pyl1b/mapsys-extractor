@@ -1,13 +1,13 @@
-"""TE5/VS50 text metadata structures and parser.
+"""TE5/VA50 text metadata structures and parser.
 
-This module defines typed data structures for the VS50 (TE5) text metadata
+This module defines typed data structures for the VA50 (TE5) text metadata
 format and provides a parser to read these structures from a ``bytes``
 buffer.
 
 The layout follows the ImHex pattern provided by the user:
 
 Header (little-endian):
-- signature: 4 bytes, must be ``b"VS50"``
+- signature: 4 bytes, must be ``b"VA50"``
 - unk: 1 x ``u8`` (purpose unknown)
 - pad: 6 x ``u32`` (padding, unknown values)
 
@@ -57,19 +57,23 @@ FLAG_TEXT_FRAME = 0x02
 FLAG_TRUE_TYPE_FONT = 0x20
 
 
+# Composed types used in data classes
+Te5PadSix = Tuple[int, int, int, int, int, int]
+
+
 @dataclass(frozen=True)
 class Te5Header:
-    """TE5/VS50 header.
+    """TE5/VA50 header.
 
     Attributes:
-        signature: File signature, expected to be ``b"VS50"``.
+        signature: File signature, expected to be ``b"VA50"``.
         unk: Single 8-bit value with unknown purpose.
         pad: Six 32-bit unsigned integers (padding/unknown fields).
     """
 
     signature: bytes
     unk: int
-    pad: Tuple[int, int, int, int, int, int]
+    pad: Te5PadSix
 
 
 @dataclass(frozen=True)
@@ -253,7 +257,7 @@ def _parse_text_meta_records(
 
 
 def parse_te5(data: bytes) -> Tuple[Te5Header, List[Te5TextMeta]]:
-    """Parse a TE5/VS50 text metadata file from bytes.
+    """Parse a TE5/VA50 text metadata file from bytes.
 
     Args:
         data: File content as bytes.

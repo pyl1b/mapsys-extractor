@@ -1,4 +1,4 @@
-"""AS5/VS50 offsets table parser.
+"""AS5/VA50 offsets table parser.
 
 The AS5 table stores only 32-bit offsets (little-endian) pointing into the
 vertices list used by polylines. There is no per-record structure beyond the
@@ -6,13 +6,12 @@ offset values.
 
 Layout (little-endian, per observed ImHex pattern):
 
-- Header: ``<4s5IB``
-  - signature: ``b"VS50"``
-  - int1: 5 x ``u32`` (unknown purpose)
+- Header: ``<4s4IB``
+  - signature: ``b"VA50"``
+  - int1: 4 x ``u32`` (unknown purpose)
   - pad: 1 x ``u8``
 
 - Data: sequence of ``u32`` values until EOF
-
 """
 
 from __future__ import annotations
@@ -34,8 +33,8 @@ class As5Header:
     """AS5 file header.
 
     Attributes:
-        signature: File signature, expected to be ``b"VS50"``.
-        int1: Five 32-bit unsigned integers with unknown purpose.
+        signature: File signature, expected ``b"VA50"``.
+        int1: Four 32-bit unsigned integers with unknown purpose.
         pad: Single 8-bit value (usually 0).
     """
 
@@ -47,7 +46,15 @@ class As5Header:
 def _parse_as5_header(data: bytes, offset: int = 0) -> Tuple[As5Header, int]:
     """Parse the AS5 header starting at ``offset``.
 
-    Returns the parsed header and the new offset after the header.
+    Args:
+        data: Entire file as bytes.
+        offset: Start offset of the header.
+
+    Returns:
+        A tuple of (``As5Header``, new offset after the header).
+
+    Raises:
+        ValueError: If the buffer is too small or the signature is invalid.
     """
 
     if len(data) - offset < _AS5_HEADER_STRUCT.size:
@@ -67,7 +74,12 @@ def _parse_as5_header(data: bytes, offset: int = 0) -> Tuple[As5Header, int]:
 def _parse_offsets(data: bytes, offset: int) -> Tuple[List[int], int]:
     """Parse ``u32`` offsets until EOF, starting at ``offset``.
 
-    Returns the list of offsets and the final offset.
+    Args:
+        data: Entire file as bytes.
+        offset: Offset to the first ``u32`` offset value.
+
+    Returns:
+        A tuple (list of offsets, final offset after the last full ``u32``).
     """
 
     offsets: List[int] = []
@@ -87,7 +99,14 @@ def _parse_offsets(data: bytes, offset: int) -> Tuple[List[int], int]:
 
 
 def parse_as5(data: bytes) -> Tuple[As5Header, List[int]]:
-    """Parse a VS50/AS5 file from bytes, returning header and offsets list."""
+    """Parse a VA50/AS5 file from bytes, returning header and offsets list.
+
+    Args:
+        data: File content as bytes.
+
+    Returns:
+        Tuple of (``As5Header``, list of 32-bit offsets).
+    """
 
     header, offset = _parse_as5_header(data, 0)
     offsets, _ = _parse_offsets(data, offset)

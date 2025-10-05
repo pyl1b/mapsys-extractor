@@ -1,9 +1,12 @@
-"""
-Extract all tables from an Access .mdb/.accdb into simple Python structures.
+"""Extract all user tables from an Access database into plain Python data.
+
+This module connects to a Microsoft Access ``.mdb``/``.accdb`` file using
+ODBC and extracts each non-system table as a list of row dictionaries. The
+result can be easily serialized to JSON or used directly in Python code.
 
 Usage:
     data = extract_access_db("path/to/db.mdb")
-    # data is a dict: { table_name: [ {col: val, ...}, ... ], ... }
+    # ``data`` is { table_name: [ {column: value, ...}, ... ], ... }
 
     # If you want JSON:
     import json
@@ -24,8 +27,31 @@ import pyodbc  # type: ignore
 logger = logging.getLogger(__name__)
 
 
+# -------------------- Composed types --------------------
+
+
+# Note: we keep row dictionaries flexible (``Dict[str, Any]``) because table
+# schemas vary and error rows may include an ``"error"`` field.
+RowDict = Dict[str, Any]
+TableData = List[RowDict]
+ExtractedDb = Dict[str, TableData]
+
+
 def _convert_value(v: Any) -> Any:
-    """Make values JSON/pure-Python friendly."""
+    """Make a value JSON- and pure-Python-friendly.
+
+    The conversion rules are conservative and readable:
+
+    - ``datetime``/``date`` -> ISO 8601 string
+    - ``Decimal`` -> ``float`` (for simplicity)
+    - binary-like (``bytes``, ``bytearray``, ``memoryview``) -> hex string
+
+    Args:
+        v: Input value as returned by the database driver.
+
+    Returns:
+        The converted value suitable for JSON serialization.
+    """
     if isinstance(v, (datetime, date)):
         return v.isoformat()
     if isinstance(v, Decimal):
@@ -38,7 +64,23 @@ def _convert_value(v: Any) -> Any:
     return v
 
 
-def _extract_with_pyodbc(db_path: str) -> Dict[str, List[Dict[str, Any]]]:
+def _extract_with_pyodbc(db_path: str) -> ExtractedDb:
+    """Extract tables using ``pyodbc``.
+
+    Tries a small list of common Access ODBC drivers and connects using the
+    first one that succeeds. System tables (``MSys*``) are skipped.
+
+    Args:
+        db_path: Path to the ``.mdb``/``.accdb`` file.
+
+    Returns:
+        A mapping of table name to list of row dictionaries.
+
+    Throws:
+        RuntimeError: If a connection cannot be established with any known
+            driver.
+    """
+
     # Common Access driver name on Windows. On macOS/Linux you may have a
     # unixODBC driver installed.
     drivers = [
@@ -63,7 +105,7 @@ def _extract_with_pyodbc(db_path: str) -> Dict[str, List[Dict[str, Any]]]:
             f"Tried drivers {drivers}. Last error: {last_err}"
         )
 
-    data: Dict[str, List[Dict[str, Any]]] = {}
+    data: ExtractedDb = {}
     try:
         cur = conn.cursor()
 
@@ -110,9 +152,21 @@ def _extract_with_pyodbc(db_path: str) -> Dict[str, List[Dict[str, Any]]]:
 # -------------------- Public API --------------------
 
 
-def extract_access_db(db_path: str) -> Dict[str, List[Dict[str, Any]]]:
-    """
-    Extract all non-system tables to {table: [row dicts]}.
+def extract_access_db(db_path: str) -> ExtractedDb:
+    """Extract all non-system tables to ``{table: [row dicts]}``.
+
+    This is the public API and includes a simple existence check for the
+    database file path. Internally it uses ``pyodbc`` extraction.
+
+    Args:
+        db_path: Path to the ``.mdb``/``.accdb`` file.
+
+    Returns:
+        A mapping of table name to list of row dictionaries.
+
+    Throws:
+        FileNotFoundError: If ``db_path`` does not exist.
+        RuntimeError: If connecting via ODBC fails.
     """
     if not os.path.exists(db_path):
         raise FileNotFoundError(db_path)

@@ -1,16 +1,18 @@
-"""VS50/TS5 text storage parser.
+"""VA50/TS5 text storage parser.
 
-This module parses a VS50 container that stores a sequence of
-null-terminated UTF-8 strings after a simple header.
+This module parses a VA50 container that stores a sequence of
+null-terminated strings after a simple header. Texts are decoded using
+Windows-1250 by default; if decoding fails, UTF-8 with replacement is used.
 
 Header (little-endian):
-- signature: 4 bytes, must be b"VS50"
+- signature: 4 bytes, must be b"VA50"
 - int1: 4 x u32 (purpose unknown)
 - pad: 1 x u8 (usually 0)
 
 Following the header, the file contains a sequence of C-strings until EOF.
 Each string is stored as bytes terminated by a single NUL (0x00). For each
-string we also report the absolute file offset where the string starts.
+string we report the string-block-relative byte offset where the string
+starts (i.e. offset 0 corresponds to the first string after the header).
 """
 
 from __future__ import annotations
@@ -24,6 +26,8 @@ logger = logging.getLogger(__name__)
 
 
 _TS5_HEADER_STRUCT = struct.Struct("<4s4IB")
+# Composed types used in data classes
+Ts5IntQuad = Tuple[int, int, int, int]
 
 
 @dataclass(frozen=True)
@@ -31,13 +35,13 @@ class Ts5Header:
     """TS5 file header.
 
     Attributes:
-        signature: File signature, expected to be b"VS50".
+        signature: File signature, expected to be b"VA50".
         int1: Four 32-bit unsigned integers with unknown purpose.
         pad: Single 8-bit value (usually 0).
     """
 
     signature: bytes
-    int1: Tuple[int, int, int, int]
+    int1: Ts5IntQuad
     pad: int
 
 
@@ -47,7 +51,7 @@ class Ts5Text:
 
     Attributes:
         offset: The byte offset where the string starts in the file.
-        text: The decoded UTF-8 string content (without the terminating NUL).
+        text: The decoded string content (without the terminating NUL).
     """
 
     offset: int
@@ -86,7 +90,9 @@ def _parse_cstrings_until_eof(
 ) -> Tuple[List[Ts5Text], int]:
     """Parse null-terminated strings until EOF.
 
-    For each string, record its starting offset and decode using UTF-8.
+    For each string, record its starting offset relative to the string block
+    and decode using Windows-1250 by default. If decoding fails, fall back to
+    UTF-8 with replacement for invalid sequences.
     """
     original_o = offset
     texts: List[Ts5Text] = []
@@ -104,12 +110,12 @@ def _parse_cstrings_until_eof(
             raw = data[start:end]
             offset = end
 
-        # Decode as UTF-8. Empty strings are allowed.
+        # Decode as Windows-1250 (common for these files). Empty strings ok.
         try:
             text = raw.decode("windows-1250")
         except UnicodeDecodeError:
             logger.debug(
-                "Invalid UTF-8 sequence in TS5 at %d; using replacement",
+                "Invalid Windows-1250 sequence in TS5 at %d; using UTF-8 repl",
                 start,
             )
             text = raw.decode("utf-8", errors="replace")
@@ -120,13 +126,16 @@ def _parse_cstrings_until_eof(
 
 
 def parse_ts5(data: bytes) -> Tuple[Ts5Header, List[Ts5Text]]:
-    """Parse a VS50/TS5 file from bytes.
+    """Parse a VA50/TS5 file from bytes.
 
     Args:
         data: File content as bytes.
 
     Returns:
         Tuple of (``Ts5Header``, list of ``Ts5Text``).
+
+    Raises:
+        ValueError: If the header is invalid or the buffer is too small.
     """
 
     header, offset = _parse_ts5_header(data, 0)
