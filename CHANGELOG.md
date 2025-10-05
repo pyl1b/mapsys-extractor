@@ -9,8 +9,6 @@ Versioning.
 
 ### Added (Unreleased)
 
-- In interactive `browse` CLI allow adding or refreshing a repository.
-- Use Dependabot
 - VA50/AR5 parser for polyline index (`mapsys.ar5_polys`) with unit tests.
 - Access MDB/ACCDB extractor module docs and tests
   (`mapsys.parser.mdb_support` and `tests/test_mdb_support.py`).
@@ -59,21 +57,10 @@ Versioning.
 - Add unit tests for content aggregation (`tests/test_content.py`) covering
   discovery, `get_poly_layer` and `text_by_offset`.
 
-## 0.1.4
+### Features (Unreleased)
 
-### Added (0.1.4)
-
-- Interactive `browse` CLI command to navigate repositories, directories and files.
-  - Up/Down to navigate, Enter to select, `i` to type index/name/path (quotes supported),
-    `b`/Backspace to go to parent, `c` to open in VS Code, `q` to quit.
-  - Shows file metadata from the database and indicates whether a file changed
-    (mtime/hash) compared to the index.
-- New `mapsys.navigation` module with helpers for listing and resolving items,
-  and checking file status. Also includes optional VS Code integration via `code`.
-- Beginner-friendly install instructions in README.
-- GitHub Actions workflow to run tests on each push and pull request.
-- GitHub Actions workflow to publish to PyPI on GitHub release.
-
-### Changed (0.1.4)
-
-- Documentation updates for the new `browse` command in README.
+- XLSX export utility and CLI commands:
+  - New module `mapsys/xl.py` with `export_to_xlsx(content, xlsx_path)` that
+    writes one sheet per table and a `Headers` sheet; floats use 3 decimals.
+  - New CLI commands: `to-xlsx` (single project) and `to-xlsx-dir` (tree).
+  - Documentation updates in `README.md` and tests under `tests/`.

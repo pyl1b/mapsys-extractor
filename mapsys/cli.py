@@ -343,3 +343,160 @@ def mapsys_dir_to_dxf(
             f"{converted_count} files."
         )
     )
+
+
+@cli.command(name="to-xlsx")
+@click.argument(
+    "root", type=click.Path(file_okay=False, dir_okay=True, exists=True)
+)
+@click.option(
+    "--xlsx",
+    "xlsx_path",
+    type=click.Path(
+        file_okay=True, dir_okay=False, writable=True, path_type=Path
+    ),
+    default=Path("mapsys.xlsx"),
+    show_default=True,
+    help="Path to the XLSX file to create.",
+)
+def mapsys_to_xlsx(root: str, xlsx_path: Path) -> None:
+    """Export parsed content under ROOT into a single XLSX workbook.
+
+    The ROOT directory must contain exactly one ``.pr5`` file that serves as
+    the main file. All companion files with the same stem will be discovered
+    and exported to the specified XLSX path.
+    """
+
+    from mapsys.parser.content import Content
+    from mapsys.xl import export_to_xlsx
+
+    root_path = Path(root)
+
+    # Locate the main .pr5 file in ROOT (non-recursive).
+    main_file = None
+    for file_path in root_path.glob("*.pr5"):
+        if file_path.is_file():
+            if main_file is not None:
+                logging.error(
+                    "Multiple main files found: %s and %s",
+                    main_file,
+                    file_path,
+                )
+                return
+            main_file = file_path
+    if main_file is None:
+        click.echo("No main file found.", err=True)
+        return
+    logging.debug("Found main file: %s", main_file)
+
+    # Parse content and export to XLSX.
+    content = Content.create(main_file)
+    if content is None:
+        click.echo("No content found.", err=True)
+        return
+
+    try:
+        export_to_xlsx(content, xlsx_path)
+    except Exception as exc:  # pragma: no cover
+        logging.exception("Failed exporting to XLSX: %s", exc)
+        click.echo("Export failed.", err=True)
+        return
+
+    click.echo("Done")
+
+
+@cli.command(name="to-xlsx-dir")
+@click.argument(
+    "root", type=click.Path(file_okay=False, dir_okay=True, exists=True)
+)
+@click.option(
+    "--max-depth",
+    type=int,
+    default=-1,
+    show_default=True,
+    help=(
+        "Maximum recursion depth (-1 for unlimited). Root directory is "
+        "depth 0."
+    ),
+)
+@click.option(
+    "--include-backup/--exclude-backup",
+    "include_backup",
+    default=False,
+    show_default=True,
+    help=("Include directories named BACKUP during traversal when enabled."),
+)
+def mapsys_dir_to_xlsx(
+    root: str,
+    max_depth: int,
+    include_backup: bool,
+) -> None:
+    """Export all ``.pr5`` projects under ROOT into XLSX files.
+
+    For each ``.pr5`` file, the workbook is written next to it with the same
+    base name and the ``.xlsx`` extension.
+    """
+
+    from mapsys.parser.content import Content
+    from mapsys.xl import export_to_xlsx
+
+    root_path = Path(root)
+
+    # Breadth-first traversal to honor max depth and BACKUP skipping.
+    queue: list[tuple[Path, int]] = [(root_path, 0)]
+    processed_count = 0
+    converted_count = 0
+
+    while queue:
+        current, depth = queue.pop(0)
+
+        # Skip directories named BACKUP unless explicitly included.
+        if not include_backup and current.name.upper() == "BACKUP":
+            logging.debug("Skipping BACKUP directory: %s", current)
+            continue
+
+        # Process current directory if it has at least one .pr5 file.
+        pr5_files = [p for p in current.glob("*.pr5") if p.is_file()]
+        if pr5_files:
+            processed_count += 1
+            logging.info(
+                "Processing directory %s with %d .pr5 files",
+                current,
+                len(pr5_files),
+            )
+            for pr5 in pr5_files:
+                xlsx_out = pr5.with_suffix(".xlsx")
+
+                try:
+                    content = Content.create(pr5)
+                    if content is None:
+                        logging.error("Failed to parse content for %s", pr5)
+                        continue
+                except Exception:
+                    logging.exception("Failed to parse content for %s", pr5)
+                    continue
+
+                try:
+                    export_to_xlsx(content, xlsx_out)
+                    converted_count += 1
+                    click.echo(f"{xlsx_out} was created")
+                except Exception as exc:  # pragma: no cover
+                    logging.exception(
+                        "Failed exporting %s to XLSX: %s", pr5, exc
+                    )
+
+        # Enqueue children if depth allows.
+        if max_depth < 0 or depth < max_depth:
+            try:
+                for child in current.iterdir():
+                    if child.is_dir():
+                        queue.append((child, depth + 1))
+            except Exception:  # pragma: no cover
+                logging.exception("Failed listing children of %s", current)
+
+    click.echo(
+        (
+            f"Done. Processed {processed_count} directories, exported "
+            f"{converted_count} files."
+        )
+    )

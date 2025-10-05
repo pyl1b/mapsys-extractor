@@ -9,7 +9,7 @@ classifiers = [
   "License :: Other/Proprietary License",
   "Typing :: Typed",
 ]
-description = "Explore mapsys."
+description = "Extract data from MapSys packages."
 dynamic = ["version"]
 name = "mapsys"
 readme = "README.md"
@@ -18,27 +18,23 @@ license = {file = "LICENSE"}
 dependencies = [
   "click>=8.1.8,<9",
   "dotenv>=0.9.9",
-  "sqlalchemy>=2.0,<3",
-  "requests>=2.32.3,<3",
-  "beautifulsoup4>=4.12,<5",
   "attrs>=23,<26",
   "pyyaml>=6.0,<7",
   "openpyxl>=3.1,<4",
-  "InquirerPy>=0.3.4,<0.4",
   "colorama>=0.4.6,<0.5",
   "pyodbc>=5.2.0,<6",
   "ezdxf>=1.4.2,<2",
 ]
 
 [project.urls]
-Homepage = "https://github.com/pyl1b/mapsys"
-Repository = "https://github.com/pyl1b/mapsys"
-Changelog = "https://github.com/pyl1b/mapsys/blob/main/CHANGELOG.md"
-Issues = "https://github.com/pyl1b/mapsys/issues"
-Documentation = "https://github.com/pyl1b/mapsys/blob/main/README.md"
+Homepage = "https://github.com/pyl1b/mapsys-extractor"
+Repository = "https://github.com/pyl1b/mapsys-extractor"
+Changelog = "https://github.com/pyl1b/mapsys-extractor/blob/main/CHANGELOG.md"
+Issues = "https://github.com/pyl1b/mapsys-extractor/issues"
+Documentation = "https://github.com/pyl1b/mapsys-extractor/blob/main/README.md"
 
 [project.scripts]
-mapsys = "mapsys.__main__:cli"
+mapsys-ex = "mapsys.__main__:cli"
 
 [project.optional-dependencies]
 dev = [
