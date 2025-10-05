@@ -7,14 +7,14 @@ from typing import Any
 
 from attrs import define, field
 
-from mapsys.al5_poly_layer import Al5Data, parse_al5
-from mapsys.ar5_polys import Ar5Data, parse_ar5
-from mapsys.as5_vertices import parse_as5
-from mapsys.mdb_support import extract_access_db
-from mapsys.n05_points import No5Coord, parse_no5
-from mapsys.pr5_main import Pr5File, parse_pr5
-from mapsys.te5_text_meta import Te5TextMeta, parse_te5
-from mapsys.ts5_text_store import Ts5Text, parse_ts5
+from mapsys.parser.al5_poly_layer import Al5Data, parse_al5
+from mapsys.parser.ar5_polys import Ar5Data, parse_ar5
+from mapsys.parser.as5_vertices import parse_as5
+from mapsys.parser.mdb_support import extract_access_db
+from mapsys.parser.n05_points import No5Coord, parse_no5
+from mapsys.parser.pr5_main import Pr5File, parse_pr5
+from mapsys.parser.te5_text_meta import Te5TextMeta, parse_te5
+from mapsys.parser.ts5_text_store import Ts5Text, parse_ts5
 
 logger = logging.getLogger(__name__)
 

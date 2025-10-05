@@ -153,8 +153,8 @@ def mapsys_to_dxf(
         point_block: Name of the block used for point symbols.
         point_name_attrib: Attribute tag used to store the point name/number.
     """
-    from mapsys.content import Content
-    from mapsys.to_dxf import mapsys_to_dxf
+    from mapsys.parser.content import Content
+    from mapsys.dxf.to_dxf import Builder
 
     root_path = Path(root)
 
@@ -180,7 +180,7 @@ def mapsys_to_dxf(
         click.echo("No content found.", err=True)
         return
 
-    mapsys_to_dxf(
+    Builder.convert(
         content,
         dxf_template,
         dxf_path=dxf_path,
@@ -271,8 +271,8 @@ def mapsys_dir_to_dxf(
     Directories are processed only if they contain at least one ``.pr5`` file.
     """
 
-    from mapsys.content import Content
-    from mapsys.to_dxf import mapsys_to_dxf as _export_to_dxf
+    from mapsys.parser.content import Content
+    from mapsys.dxf.to_dxf import Builder
 
     root_path = Path(root)
 
@@ -311,7 +311,7 @@ def mapsys_dir_to_dxf(
                     continue
 
                 try:
-                    _export_to_dxf(
+                    Builder.convert(
                         content,
                         dxf_template,
                         dxf_path=dxf_out,
