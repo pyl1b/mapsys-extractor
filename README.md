@@ -1,5 +1,7 @@
 # MapSys Extractor
 
+[🇺🇸 English](README.md) | [🇷🇴 Română](README.ro.md)
+
 MapSys export and inspection tools for working with MapSys projects.
 
 MapSys is a Software solution created by GeoTop SRL in Odorheiul Secuiesc,
