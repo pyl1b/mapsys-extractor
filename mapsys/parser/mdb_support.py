@@ -110,20 +110,26 @@ def _extract_with_pyodbc(db_path: str) -> ExtractedDb:
         cur = conn.cursor()
 
         # List user tables; avoid MSys* system tables
-        tables = []
+        tables: List[str] = []
         for row in cur.tables(tableType="TABLE"):
             name = row.table_name
             if not name.startswith("MSys"):
                 tables.append(name)
 
-        # Fallback: some drivers don’t return table types reliably
-        if not tables:
+        # Also query the MSysObjects fallback and merge results. Some drivers
+        # do not report table types reliably via .tables(), but expose names
+        # through MSysObjects. The union ensures maximal coverage.
+        try:
             cur.execute(
                 "SELECT name FROM MSysObjects WHERE Type=1 AND Flags=0"
             )
-            tables = [
+            msys_names = [
                 r[0] for r in cur.fetchall() if not r[0].startswith("MSys")
             ]
+            tables = sorted({*tables, *msys_names})
+        except Exception:
+            # If the fallback query is unsupported, keep whatever we got.
+            logger.debug("MSysObjects fallback not available on this driver")
 
         for tbl in tables:
             try:

@@ -27,7 +27,7 @@ def _build_no5_bytes(
             int,
         ]
     ],
-):
+) -> bytes:
     # Header: signature, 6x u32, pad u8
     header = struct.pack("<4s6IB", b"VA50", 1, 2, 3, 4, 5, 6, 0)
 

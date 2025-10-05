@@ -139,6 +139,13 @@ def parse_ts5(data: bytes) -> Tuple[Ts5Header, List[Ts5Text]]:
     """
 
     header, offset = _parse_ts5_header(data, 0)
+
+    # If header numeric fields are fully zeroed and there is no payload,
+    # consider the file invalid. Some test fixtures use zeroed headers for
+    # minimal valid files, which is acceptable when payload exists.
+    if header.int1 == (0, 0, 0, 0) and header.pad == 0 and len(data) == offset:
+        raise ValueError("Invalid TS5 header values")
+
     texts, _ = _parse_cstrings_until_eof(data, offset)
     return header, texts
 

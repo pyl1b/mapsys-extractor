@@ -111,6 +111,11 @@ def _parse_header(data: bytes, offset: int = 0) -> Tuple[No5Header, int]:
     if signature != b"VA50":
         raise ValueError("Invalid NO5 signature: %r" % (signature,))
 
+    # Basic sanity check: a header of all-zero numeric fields is considered
+    # invalid in our corpus and indicates a corrupt or wrong file.
+    if (i1, i2, i3, i4, i5, i6, pad1) == (0, 0, 0, 0, 0, 0, 0):
+        raise ValueError("Invalid NO5 header values")
+
     # Build the header dataclass and return with new offset.
     header = No5Header(
         signature=signature,

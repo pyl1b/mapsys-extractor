@@ -132,10 +132,10 @@ class DummyMapsys:
 
         self.pr5 = PR5()
 
-    def text_by_offset(self, offset: int):
+    def text_by_offset(self, offset: int) -> str | None:
         return self.offset_to_text.get(offset)
 
-    def get_poly_layer(self, p_meta):
+    def get_poly_layer(self, p_meta: Ar5Data) -> int:
         # Route to AL5 mapping
         return self.p_layers[p_meta.lay_rec].layer
 
@@ -154,7 +154,7 @@ def _make_minimal_template(tmp_path: Path) -> Path:
     return path
 
 
-def test_builder_convert_creates_entities_and_layers(tmp_path: Path):
+def test_builder_convert_creates_entities_and_layers(tmp_path: Path) -> None:
     mapsys = DummyMapsys()
     template = _make_minimal_template(tmp_path)
 
@@ -186,7 +186,7 @@ def test_builder_convert_creates_entities_and_layers(tmp_path: Path):
     )
 
 
-def test_layer_name_includes_title_when_available(tmp_path: Path):
+def test_layer_name_includes_title_when_available(tmp_path: Path) -> None:
     mapsys = DummyMapsys()
     _ = _make_minimal_template(tmp_path)
     b = Builder(mapsys)  # type: ignore[arg-type]
@@ -214,7 +214,7 @@ def test_layer_name_includes_title_when_available(tmp_path: Path):
         ),
     ],
 )
-def test_lineweight_from_mapsys_valid(value: int, expected_index: int):
+def test_lineweight_from_mapsys_valid(value: int, expected_index: int) -> None:
     # We validate that returned value is one of VALID_DXF_LINEWEIGHTS and
     # that for small values it matches the documented mapping.
     from ezdxf.lldxf.const import VALID_DXF_LINEWEIGHTS
@@ -226,17 +226,17 @@ def test_lineweight_from_mapsys_valid(value: int, expected_index: int):
 
 
 @pytest.mark.parametrize("bad", [-1, 256])
-def test_lineweight_from_mapsys_out_of_range_raises(bad: int):
+def test_lineweight_from_mapsys_out_of_range_raises(bad: int) -> None:
     with pytest.raises(ValueError):
         Builder.lineweight_from_mapsys(bad)
 
 
-def test_lineweight_from_mapsys_type_error():
+def test_lineweight_from_mapsys_type_error() -> None:
     with pytest.raises(TypeError):
         Builder.lineweight_from_mapsys("3")  # type: ignore[arg-type]
 
 
-def test_rotate_dxf_backups(tmp_path: Path):
+def test_rotate_dxf_backups(tmp_path: Path) -> None:
     target = tmp_path / "out.dxf"
     # Create three generations
     target.write_text("v1")

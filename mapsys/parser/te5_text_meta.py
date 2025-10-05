@@ -181,6 +181,10 @@ def _parse_te5_header(data: bytes, offset: int = 0) -> Tuple[Te5Header, int]:
     if signature != b"VA50":
         raise ValueError("Invalid TE5 signature: %r" % (signature,))
 
+    # Sanity: all-zero padding with unk=0 is considered invalid header.
+    if unk == 0 and (p1, p2, p3, p4, p5, p6) == (0, 0, 0, 0, 0, 0):
+        raise ValueError("Invalid TE5 header values")
+
     # Build the header dataclass and return with new offset.
     header = Te5Header(
         signature=signature, unk=unk, pad=(p1, p2, p3, p4, p5, p6)

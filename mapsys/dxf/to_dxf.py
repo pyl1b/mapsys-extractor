@@ -181,10 +181,11 @@ class Builder:
             if not dxf_path.exists():
                 return
 
+            # Backups use the base file name without extension, e.g. out.bak1
+            backup_base = dxf_path.with_name(dxf_path.stem)
+
             # Delete the oldest backup if it exists to make room.
-            oldest = dxf_path.with_suffix(
-                dxf_path.suffix + f".bak{max_backups}"
-            )
+            oldest = backup_base.with_suffix(f".bak{max_backups}")
             if oldest.exists():
                 try:
                     oldest.unlink()
@@ -195,8 +196,8 @@ class Builder:
 
             # Shift backups in descending order to avoid overwriting.
             for idx in range(max_backups - 1, 0, -1):
-                src = dxf_path.with_suffix(dxf_path.suffix + f".bak{idx}")
-                dst = dxf_path.with_suffix(dxf_path.suffix + f".bak{idx + 1}")
+                src = backup_base.with_suffix(f".bak{idx}")
+                dst = backup_base.with_suffix(f".bak{idx + 1}")
                 if src.exists():
                     try:
                         src.rename(dst)
@@ -205,11 +206,10 @@ class Builder:
                             "Failed rotating backup %s -> %s", src, dst
                         )
 
-            # Finally rename the current file to .bak1.
+            # Finally rename the current file to first backup
+            # (e.g. out -> out.bak1).
             try:
-                dxf_path.rename(
-                    dxf_path.with_suffix(dxf_path.suffix + ".bak1")
-                )
+                dxf_path.rename(backup_base.with_suffix(".bak1"))
             except Exception:
                 logger.exception(
                     "Failed creating first backup for %s", dxf_path
