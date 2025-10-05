@@ -364,7 +364,15 @@ class Builder:
             self._rotate_dxf_backups(dxf_path, max_backups=10)
             doc.saveas(dxf_path.as_posix())
             if self.open_after_save:
-                os.startfile(dxf_path.as_posix())
+                # Use getattr to avoid mypy issues on non-Windows platforms
+                startfile = getattr(os, "startfile", None)
+                if callable(startfile):
+                    try:
+                        startfile(dxf_path.as_posix())
+                    except Exception:
+                        logger.exception(
+                            "Failed opening DXF file: %s", dxf_path
+                        )
 
         return doc
 

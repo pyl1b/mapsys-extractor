@@ -74,7 +74,7 @@ extend-exclude = ["venv", ".venv"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "ANN"]  # E=pycodestyle, F=pyflakes, I=imports
-ignore = ["ANN102", "ANN401", "E501"]
+ignore = ["ANN401", "E501"]
 
 [tool.ruff.format]
 quote-style = "double"

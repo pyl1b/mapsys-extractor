@@ -34,5 +34,51 @@
         "python": "${workspaceFolder}//venv//Scripts//python.exe"
       }
     },
+    {
+      "name": "to-xlsx",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "mapsys.__main__",
+      "args": [
+        "--trace",
+        "--log-file",
+        "${workspaceFolder}/playground/mapsys-to-xlsx.log",
+        "to-xlsx",
+        // Project directory containing a single .pr5
+        "E:/Advaita/altele/Resurse pe UAT-uri/Voslobeni/vice/tarlale(numai)",
+        // "${workspaceFolder}/playground/sample",
+        "--xlsx",
+        "${workspaceFolder}/playground/mapsys-output.xlsx"
+      ],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      "windows": {
+        "python": "${workspaceFolder}//venv//Scripts//python.exe"
+      }
+    },
+    {
+      "name": "to-xlsx-dir",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "mapsys.__main__",
+      "args": [
+        "--trace",
+        "--log-file",
+        "${workspaceFolder}/playground/mapsys-to-xlsx.log",
+        "to-xlsx-dir",
+        // Root directory to scan for .pr5 files
+        "${workspaceFolder}/playground",
+        "--max-depth",
+        "1",
+        "--exclude-backup"
+      ],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      "windows": {
+        "python": "${workspaceFolder}//venv//Scripts//python.exe"
+      }
+    },
   ]
 }

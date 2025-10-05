@@ -63,4 +63,3 @@ Versioning.
   - New module `mapsys/xl.py` with `export_to_xlsx(content, xlsx_path)` that
     writes one sheet per table and a `Headers` sheet; floats use 3 decimals.
   - New CLI commands: `to-xlsx` (single project) and `to-xlsx-dir` (tree).
-  - Documentation updates in `README.md` and tests under `tests/`.

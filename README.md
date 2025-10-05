@@ -13,7 +13,7 @@ This open-source repository is a small, unaffiliated utility that helps you
 convert MapSys projects to DXF and explore their data structures. It is not a
 replacement for the original MapSys application.
 
-## What this project does (plain language)
+## What this project does
 
 - It looks for a MapSys "main" project file (usually a file like `*.pr5`) in
   a folder and reads the associated data files found next to it (points,
@@ -22,56 +22,134 @@ replacement for the original MapSys application.
   CAD software (AutoCAD, BricsCAD, DraftSight, free viewers, etc.).
 - It also contains building blocks for developers to read MapSys data files.
 
-## Quick start for non-technical users
+## Install
 
-1) Install Python 3.11 or newer.
+The steps below are written for beginners. They show how to:
 
-2) Create a virtual environment.
+1) Install Python
+2) Create a private “virtual environment”
+3) Get the project from GitHub
+4) Install it into your environment and run it
 
-   On Linux/macOS:
+You only need to do this once on your computer. After that, you can just
+activate the environment and use the tool.
 
-   ```bash
-   python3.11 -m venv .venv
-   source .venv/bin/activate
-   ```
+### 1) Install Python (version 3.11 or newer)
 
-   On Windows (PowerShell):
+- Windows:
+  - Go to the official Python website: `https://www.python.org/downloads/`
+  - Download “Python 3.x” for Windows and run the installer.
+  - Important: On the first screen, check the box “Add Python to PATH”,
+    then click Install.
+  - After install, open PowerShell and type:
 
-   ```powershell
-   python -m venv .venv
-   .\.venv\Scripts\Activate.ps1
-   ```
+    ```powershell
+    python --version
+    ```
 
-   To leave the environment later, run `deactivate`.
+    You should see something like `Python 3.11.8` (any 3.11+ is fine).
 
-3) Install this tool inside the environment.
+- macOS:
+  - Visit `https://www.python.org/downloads/` and install the latest 3.x for macOS.
+  - Open Terminal and type `python3 --version` to confirm.
 
-   With Make (recommended if available):
+- Linux (Ubuntu/Debian):
+  - Open Terminal and run:
 
-   ```bash
-   make init
-   ```
+  ```bash
+  sudo apt update && sudo apt install -y python3 python3-venv python3-pip
+  ```
 
-   Or with pip directly:
+  - Confirm with: `python3 --version`
 
-   ```bash
-   python -m pip install -e .
-   ```
+### 2) Create a virtual environment (keeps things clean)
 
-4) Prepare a folder that contains your MapSys project. Place the "main"
-   project file (e.g. `something.pr5`) and its companion files in the same
-   directory.
+Pick a folder where you want to keep this project (for example,
+`D:\tools\mapsys-extractor` on Windows or `~/tools/mapsys-extractor` on
+macOS/Linux). Then:
 
-5) Export to DXF using the provided template.
+- Windows PowerShell:
 
-   ```bash
-   mapsys to-dxf PATH/TO/YOUR/FOLDER \
-     --dxf-template playground/template.dxf \
-     --dxf PATH/TO/OUTPUT/your-project.dxf
-   ```
+  ```powershell
+  python -m venv .venv
+  . .venv\Scripts\Activate.ps1
+  ```
 
-   If everything goes well, a `your-project.dxf` file will be created that you
-   can open in a CAD application.
+- macOS/Linux Terminal:
+
+  ```bash
+  python3 -m venv .venv
+  source .venv/bin/activate
+  ```
+
+If activation worked, your prompt will show `(.venv)` at the start. While this
+is active, anything you install stays private to this folder.
+
+### 3) Get the project from GitHub
+
+If you have Git installed, you can clone the repository. If not, you can click
+the green “Code” button on GitHub and download the ZIP, then unzip it into your
+chosen folder.
+
+Using Git (recommended):
+
+```bash
+git clone https://github.com/pyl1b/mapsys-extractor.git
+cd mapsys-extractor
+```
+
+### 4) Install the tool into your environment
+
+With the virtual environment still active and inside the `mapsys-extractor` folder,
+run:
+
+- Windows PowerShell:
+
+  ```powershell
+  python -m pip install --upgrade pip
+  python -m pip install -e .
+  ```
+
+- macOS/Linux:
+
+  ```bash
+  python3 -m pip install --upgrade pip
+  python3 -m pip install -e .
+  ```
+
+This installs the library and the `mapsys-extractor` command.
+
+### 5) Try it out
+
+Show the help to confirm it’s installed:
+
+```bash
+find-stuff --help
+```
+
+Later, when you come back to use the tool again, just re-activate the
+environment (step 2) and you’re ready.
+
+### 6) Use it
+
+Prepare a folder that contains your MapSys project. Place the "main"
+project file (e.g. `something.pr5`) and its companion files in the same
+directory.
+
+Create a dxf file to use as template. This can have stuff in it or be empty;
+we use it because the application can be configured to export the MapSys points
+as blocks with attributes, in which case this template file should have that
+block definition already present. See the help for the `to-dxf` command
+(`mapsys to-dxf --help`) to get a list of arguments related to block export.
+
+```bash
+mapsys to-dxf PATH/TO/YOUR/FOLDER \
+  --dxf-template template.dxf \
+  --dxf PATH/TO/OUTPUT/your-project.dxf
+```
+
+If everything goes well, a `your-project.dxf` file will be created in the same
+directory as the .pr5 file.
 
 ## Command-line usage
 
@@ -86,7 +164,7 @@ file:
 
 ```bash
 mapsys to-dxf /path/to/project \
-  --dxf-template playground/template.dxf \
+  --dxf-template template.dxf \
   --dxf /path/to/output.dxf
 ```
 
@@ -94,13 +172,13 @@ Export all projects found under a directory tree (one DXF per `.pr5` file):
 
 ```bash
 mapsys to-dxf-dir /path/to/root \
-  --dxf-template playground/template.dxf
+  --dxf-template template.dxf
 ```
 
 Notes:
 
-- The template must define at least a `POINT` block with attributes `NAME`,
-  `SOURCE` and `Z` (the sample `playground/template.dxf` does this).
+- The template should define at least a `POINT` block with attributes `NAME`,
+  `SOURCE` and `Z`.If it does a circle will be created for each point.
 - The tool derives layer names and colors from your MapSys layers.
 - When using `to-dxf`, the directory must contain exactly one `.pr5` file.
 
@@ -154,7 +232,6 @@ High-level overview of the most relevant folders and files:
     via ODBC, for related data.
 - `tests/`: Automated tests that verify the parsers and the DXF export.
   Includes tests for the XLSX export and CLI commands.
-- `playground/`: Sample template and various sample assets for experiments.
 
 ## Troubleshooting
 

@@ -135,6 +135,47 @@ def _row_dict_from_obj(index: int, obj: Any) -> dict[str, Any]:
     return row
 
 
+def _order_columns(title: str, discovered_columns: list[str]) -> list[str]:
+    """Return ordered column names for a worksheet.
+
+    - ``idx`` is always placed first when present.
+    - For the ``NO5_points`` sheet, enforce a domain-specific order after
+      ``idx``: ``pt_nr``, ``north``, ``east``, ``z``, ``id_nr``, ``layer``,
+      ``type``. Remaining columns are appended in sorted order.
+    - For all other sheets, columns are sorted alphabetically with ``idx``
+      moved to the front.
+    """
+
+    # Start from a set to remove duplicates while preserving only known keys.
+    columns = list(discovered_columns)
+
+    # Ensure idx is first when present
+    result: list[str] = []
+    if "idx" in columns:
+        result.append("idx")
+        columns.remove("idx")
+
+    # Domain-specific preferred order for NO5 points
+    if title == "NO5_points":
+        preferred_after_idx = [
+            "pt_nr",
+            "north",
+            "east",
+            "z",
+            "id_nr",
+            "layer",
+            "type",
+        ]
+        for name in preferred_after_idx:
+            if name in columns:
+                result.append(name)
+                columns.remove(name)
+
+    # Append remaining columns in stable sorted order
+    result.extend(sorted(columns))
+    return result
+
+
 def _write_table_sheet(
     wb: Workbook,
     title: str,
@@ -152,10 +193,11 @@ def _write_table_sheet(
     # Build flattened rows
     rows = [_row_dict_from_obj(i, obj) for i, obj in enumerate(objects)]
 
-    # Column ordering: stable sorted keys
+    # Column discovery followed by ordering policy
     columns: list[str] = sorted({k for row in rows for k in row.keys()})
     if not columns:
         columns = ["idx"]
+    columns = _order_columns(title, columns)
 
     # Write header
     ws.append(columns)

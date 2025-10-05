@@ -73,19 +73,82 @@
         "clear": true
       },
       "problemMatcher": []
+    },
+    
+    {
+      "label": "MapSys to XLSX",
+      "type": "process",
+      "command": "${command:python.interpreterPath}",
+      "windows": {
+        "command": "${workspaceFolder}\\venv\\Scripts\\python.exe"
+      },
+      "args": [
+        "mapsys",
+        "--trace",
+        "--log-file",
+        "${workspaceFolder}/playground/mapsys-to-xlsx.log",
+        "to-xlsx",
+        "${input:src}",
+        "--xlsx",
+        "${input:xlsxDestination}"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    
+    {
+      "label": "All MapSys to XLSX",
+      "type": "process",
+      "command": "${command:python.interpreterPath}",
+      "windows": {
+        "command": "${workspaceFolder}\\venv\\Scripts\\python.exe"
+      },
+      "args": [
+        "mapsys",
+        "--trace",
+        "--log-file",
+        "${workspaceFolder}/playground/mapsys-to-xlsx.log",
+        "to-xlsx-dir",
+        "${input:src}",
+        "--max-depth",
+        "-1",
+        "--exclude-backup"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": []
     }
   ],
   "inputs": [
     {
       "id": "src",
       "type": "promptString",
-      "description": "Source directorywhere the Mapsys files are located."
+      "description": "Source directory where the Mapsys files are located."
     },
     {
       "id": "destination",
       "type": "promptString",
       "description": "Destination DXF file to create.",
       "default": "${workspaceFolder}/playground/mapsys-output.dxf"
+    },
+    {
+      "id": "xlsxDestination",
+      "type": "promptString",
+      "description": "Destination XLSX file to create.",
+      "default": "${workspaceFolder}/playground/mapsys-output.xlsx"
     }
   ]
 }
