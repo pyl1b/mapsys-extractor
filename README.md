@@ -1,6 +1,6 @@
 # mapsys
 
-MapSys export and inspection tools for working with legacy MapSys projects.
+MapSys export and inspection tools for working with MapSys projects.
 
 MapSys is a Software solution created by GeoTop SRL in Odorheiul Secuiesc,
 Romania. The official MapSys GIS functionality enables efficient generation
@@ -9,9 +9,14 @@ specialized functions, with the goal of creating a relational data model
 loaded with topologically validated information. Such data can be used in
 MapSys or in any GIS/alfanumeric data management application.
 
-This open-source repository is a small, unaffiliated utility that helps you
+This open-source repository is a small, *unaffiliated* utility that helps you
 convert MapSys projects to DXF and explore their data structures. It is not a
 replacement for the original MapSys application.
+
+As the format of the files is not openly documented, their structure
+had to be determined by examining the hex dump. The meaning for a lot of fields
+is still unknown. Always check the output and file an issue if it does
+not match the input.
 
 ## What this project does
 
