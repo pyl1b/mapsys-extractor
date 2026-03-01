@@ -28,9 +28,7 @@
         "--point-z-attrib",
         "Z"
       ],
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
+      "options": { "cwd": "${workspaceFolder}" },
       "presentation": {
         "reveal": "always",
         "panel": "dedicated",
@@ -38,7 +36,6 @@
       },
       "problemMatcher": []
     },
-    
     {
       "label": "All MapSys to DXF",
       "type": "process",
@@ -62,11 +59,11 @@
         "--point-source-attrib",
         "SOURCE",
         "--point-z-attrib",
-        "Z"
+        "Z",
+        "--report",
+        "${input:reportPath}"
       ],
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
+      "options": { "cwd": "${workspaceFolder}" },
       "presentation": {
         "reveal": "always",
         "panel": "dedicated",
@@ -74,7 +71,6 @@
       },
       "problemMatcher": []
     },
-    
     {
       "label": "MapSys to XLSX",
       "type": "process",
@@ -92,9 +88,7 @@
         "--xlsx",
         "${input:xlsxDestination}"
       ],
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
+      "options": { "cwd": "${workspaceFolder}" },
       "presentation": {
         "reveal": "always",
         "panel": "dedicated",
@@ -102,7 +96,6 @@
       },
       "problemMatcher": []
     },
-    
     {
       "label": "All MapSys to XLSX",
       "type": "process",
@@ -119,11 +112,11 @@
         "${input:src}",
         "--max-depth",
         "-1",
-        "--exclude-backup"
+        "--exclude-backup",
+        "--report",
+        "${input:reportPath}"
       ],
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
+      "options": { "cwd": "${workspaceFolder}" },
       "presentation": {
         "reveal": "always",
         "panel": "dedicated",
@@ -149,6 +142,12 @@
       "type": "promptString",
       "description": "Destination XLSX file to create.",
       "default": "${workspaceFolder}/playground/mapsys-output.xlsx"
+    },
+    {
+      "id": "reportPath",
+      "type": "promptString",
+      "description": "Conversion report Excel file path.",
+      "default": "${workspaceFolder}/playground/conversion-report.xlsx"
     }
   ]
 }

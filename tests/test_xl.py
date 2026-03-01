@@ -17,7 +17,7 @@ from mapsys.parser.content import Content
 from mapsys.parser.n05_points import No5Coord
 from mapsys.parser.te5_text_meta import Te5TextMeta
 from mapsys.parser.ts5_text_store import Ts5Text
-from mapsys.xl import export_to_xlsx, write_dxf_report
+from mapsys.xl import export_to_xlsx, write_dxf_report, write_xlsx_report
 
 
 def _make_min_content(tmp_path: Path) -> Content:
@@ -220,3 +220,21 @@ class TestWriteDxfReport:
         assert ws.cell(row=2, column=5).value == 3
         assert ws.cell(row=2, column=14).value == 999
         assert "2025-01-15 09:00:00" in str(ws.cell(row=2, column=13).value)
+
+
+class TestWriteXlsxReport:
+    """Tests for write_xlsx_report."""
+
+    def test_write_xlsx_report_creates_workbook_with_headers(
+        self, tmp_path: Path
+    ) -> None:
+        """Report with no rows creates file with headers including XLSX path."""
+        out = tmp_path / "report.xlsx"
+        write_xlsx_report([], out)
+        assert out.exists()
+        wb = load_workbook(out)
+        assert "Conversion report" in wb.sheetnames
+        ws = wb["Conversion report"]
+        headers = [c.value for c in next(ws.iter_rows(min_row=1, max_row=1))]
+        assert "XLSX path" in headers
+        assert "XLSX size (bytes)" in headers

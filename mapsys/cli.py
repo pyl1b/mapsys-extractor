@@ -487,10 +487,20 @@ def mapsys_to_xlsx(root: str, xlsx_path: Path) -> None:
     show_default=True,
     help=("Include directories named BACKUP during traversal when enabled."),
 )
+@click.option(
+    "--report",
+    "report_path",
+    type=click.Path(
+        file_okay=True, dir_okay=False, writable=True, path_type=Path
+    ),
+    default=None,
+    help="Path to an Excel file to write conversion report.",
+)
 def mapsys_dir_to_xlsx(
     root: str,
     max_depth: int,
     include_backup: bool,
+    report_path: Path | None,
 ) -> None:
     """Export all ``.pr5`` projects under ROOT into XLSX files.
 
@@ -507,6 +517,7 @@ def mapsys_dir_to_xlsx(
     queue: list[tuple[Path, int]] = [(root_path, 0)]
     processed_count = 0
     converted_count = 0
+    report_rows: list[dict] = []
 
     while queue:
         current, depth = queue.pop(0)
@@ -541,6 +552,40 @@ def mapsys_dir_to_xlsx(
                     export_to_xlsx(content, xlsx_out)
                     converted_count += 1
                     click.echo(f"{xlsx_out} was created")
+
+                    # Append report row when --report is requested.
+                    if report_path is not None:
+                        pr5_obj = content.pr5
+                        report_rows.append(
+                            {
+                                "mapsys_path": str(pr5.resolve()),
+                                "xlsx_path": str(xlsx_out.resolve()),
+                                "mapsys_name": pr5.stem,
+                                "points": len(content.points),
+                                "texts": len(content.texts),
+                                "t_meta": len(content.t_meta),
+                                "p_meta": len(content.p_meta),
+                                "v_offsets": len(content.v_offsets),
+                                "p_layers": len(content.p_layers),
+                                "pr5_layers": (
+                                    len(pr5_obj.layers)
+                                    if pr5_obj is not None
+                                    else 0
+                                ),
+                                "pr5_after": (
+                                    len(pr5_obj.after)
+                                    if pr5_obj is not None
+                                    else 0
+                                ),
+                                "pr5_fonts": (
+                                    len(pr5_obj.font_names)
+                                    if pr5_obj is not None
+                                    else 0
+                                ),
+                                "generated_at": datetime.datetime.now(),
+                                "xlsx_size_bytes": xlsx_out.stat().st_size,
+                            }
+                        )
                 except Exception as exc:  # pragma: no cover
                     logging.exception(
                         "Failed exporting %s to XLSX: %s", pr5, exc
@@ -554,6 +599,21 @@ def mapsys_dir_to_xlsx(
                         queue.append((child, depth + 1))
             except Exception:  # pragma: no cover
                 logging.exception("Failed listing children of %s", current)
+
+    # Write report if requested.
+    if report_path is not None:
+        try:
+            from mapsys.xl import write_xlsx_report
+
+            write_xlsx_report(report_rows, report_path)
+            click.echo("Report written to %s" % report_path)
+        except Exception:
+            logging.exception(
+                "Failed writing report to %s",
+                report_path,
+                exc_info=True,
+            )
+            click.echo("Report writing failed.", err=True)
 
     click.echo(
         (
