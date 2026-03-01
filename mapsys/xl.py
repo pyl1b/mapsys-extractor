@@ -21,6 +21,7 @@ Design goals:
 from __future__ import annotations
 
 import dataclasses
+import datetime
 import logging
 from collections.abc import Iterable
 from dataclasses import is_dataclass
@@ -421,4 +422,130 @@ def export_to_xlsx(content: Any, xlsx_path: Path) -> None:
     wb.save(xlsx_path.as_posix())
 
 
-__all__ = ["export_to_xlsx"]
+def write_dxf_report(
+    report_rows: list[dict[str, Any]],
+    report_path: Path,
+) -> None:
+    """Write a DXF conversion report to an Excel file.
+
+    Creates a workbook with a single "Conversion report" sheet containing
+    one row per converted file: hyperlinks to mapsys and DXF paths, Content
+    list counts, generation timestamp, and DXF file size.
+
+    Args:
+        report_rows: List of dicts with keys: mapsys_path, dxf_path,
+            mapsys_name, points, texts, t_meta, p_meta, v_offsets, p_layers,
+            pr5_layers, pr5_after, pr5_fonts, generated_at, dxf_size_bytes.
+        report_path: Path to the XLSX file to create.
+    """
+    headers = [
+        "Mapsys path",
+        "DXF path",
+        "Mapsys name",
+        "points",
+        "texts",
+        "t_meta",
+        "p_meta",
+        "v_offsets",
+        "p_layers",
+        "pr5_layers",
+        "pr5_after",
+        "pr5_fonts",
+        "Generated at",
+        "DXF size (bytes)",
+    ]
+    col_map = {h: i + 1 for i, h in enumerate(headers)}
+    mapsys_col = col_map["Mapsys path"]
+    dxf_col = col_map["DXF path"]
+    generated_col = col_map["Generated at"]
+
+    wb = Workbook()
+    ws = wb.active
+    if ws is None:
+        raise RuntimeError("Workbook has no active sheet")
+    ws.title = "Conversion report"
+
+    # Write header row.
+    for col_idx, h in enumerate(headers, start=1):
+        ws.cell(row=1, column=col_idx, value=h)
+
+    # Write data rows.
+    for row_idx, row in enumerate(report_rows, start=2):
+        ws.cell(
+            row=row_idx,
+            column=col_map["Mapsys name"],
+            value=row["mapsys_name"],
+        )
+        ws.cell(row=row_idx, column=col_map["points"], value=row["points"])
+        ws.cell(row=row_idx, column=col_map["texts"], value=row["texts"])
+        ws.cell(row=row_idx, column=col_map["t_meta"], value=row["t_meta"])
+        ws.cell(row=row_idx, column=col_map["p_meta"], value=row["p_meta"])
+        ws.cell(
+            row=row_idx,
+            column=col_map["v_offsets"],
+            value=row["v_offsets"],
+        )
+        ws.cell(
+            row=row_idx,
+            column=col_map["p_layers"],
+            value=row["p_layers"],
+        )
+        ws.cell(
+            row=row_idx,
+            column=col_map["pr5_layers"],
+            value=row["pr5_layers"],
+        )
+        ws.cell(
+            row=row_idx,
+            column=col_map["pr5_after"],
+            value=row["pr5_after"],
+        )
+        ws.cell(
+            row=row_idx,
+            column=col_map["pr5_fonts"],
+            value=row["pr5_fonts"],
+        )
+        ws.cell(
+            row=row_idx,
+            column=col_map["DXF size (bytes)"],
+            value=row["dxf_size_bytes"],
+        )
+
+        # Mapsys path with hyperlink.
+        mapsys_cell = ws.cell(
+            row=row_idx, column=mapsys_col, value=row["mapsys_path"]
+        )
+        mapsys_cell.hyperlink = str(Path(row["mapsys_path"]).as_uri())
+
+        # DXF path with hyperlink.
+        dxf_cell = ws.cell(row=row_idx, column=dxf_col, value=row["dxf_path"])
+        dxf_cell.hyperlink = str(Path(row["dxf_path"]).as_uri())
+
+        # Generated at: format datetime.
+        generated = row["generated_at"]
+        if isinstance(generated, datetime.datetime):
+            val = generated.strftime("%Y-%m-%d %H:%M:%S")
+        else:
+            val = str(generated)
+        ws.cell(row=row_idx, column=generated_col, value=val)
+
+    # Apply table style if there is data.
+    last_row = ws.max_row
+    last_col = len(headers)
+    if last_row >= 1 and last_col >= 1:
+        ref = f"A1:{get_column_letter(last_col)}{last_row}"
+        table = Table(displayName="Tbl_Conversion_report", ref=ref)
+        table.tableStyleInfo = TableStyleInfo(
+            name="TableStyleMedium2",
+            showFirstColumn=False,
+            showLastColumn=False,
+            showRowStripes=True,
+            showColumnStripes=False,
+        )
+        ws.add_table(table)
+
+    _auto_size_columns(ws)
+    wb.save(report_path.as_posix())
+
+
+__all__ = ["export_to_xlsx", "write_dxf_report"]
