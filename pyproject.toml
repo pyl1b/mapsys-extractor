@@ -40,7 +40,7 @@ mapsys-ex = "mapsys.__main__:cli"
 dev = [
   "ruff",
   "build",
-  "mypy>=1.8,<2",
+  "mypy>=1.8,<3",
   "pre-commit",
   "pytest-cov",
   "pytest-mock",
